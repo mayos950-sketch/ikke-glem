@@ -84,13 +84,13 @@ textarea{min-height:92px;resize:vertical}
     <input id="when" type="datetime-local">
 
     <div class="row">
-      <button class="btn dark" onclick="startVoice()">🎤 Snakk</button>
+      <button class="btn dark" onclick="useKeyboardDictation()">🎤 Diktat</button>
       <button class="btn gold" onclick="saveReminder()">➕ Legg til</button>
     </div>
 
     <div id="status" class="status"></div>
     <div class="small" style="margin-top:10px">
-      Testversjon: varsler fungerer sikkert mens appen er åpen. Bakgrunnsvarsler når appen er helt lukket lager vi i den ekte iPhone-versjonen senere.
+      Testversjon: På iPhone bruker vi mikrofonen på tastaturet til diktat. Det er mye mer stabilt enn nettleserens talegjenkjenning.
     </div>
   </div>
 
@@ -215,16 +215,10 @@ function schedule(){
     if(changed)render();
   },5000);
 }
-function startVoice(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){setStatus("Talegjenkjenning støttes ikke i denne nettleseren.");return}
-  const rec=new SR(); rec.lang="nb-NO"; rec.interimResults=false; rec.maxAlternatives=1;
-  rec.onresult=e=>{
-    document.getElementById("text").value=e.results[0][0].transcript;
-    setStatus("Tale mottatt ✓");
-  };
-  rec.onerror=()=>setStatus("Kunne ikke høre deg. Prøv igjen.");
-  rec.start();
+function useKeyboardDictation(){
+  const field=document.getElementById("text");
+  field.focus();
+  setStatus("Trykk på mikrofonen på iPhone-tastaturet og snakk.");
 }
 if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{})}
 render();schedule();
