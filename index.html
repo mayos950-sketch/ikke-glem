@@ -4,224 +4,103 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#111827">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Ikke glem">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <title>Ikke glem</title>
 <style>
-:root{
-  --bg:#0b1020;--card:#151d31;--card2:#1c2740;--text:#fff;--muted:#a9b3c7;
-  --gold:#ffca4b;--red:#ef4444;--green:#22c55e;--blue:#3b82f6;
-}
-*{box-sizing:border-box}
-body{
-  margin:0;background:linear-gradient(180deg,#0b1020,#111827 45%,#0b1020);
-  color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-}
-.wrap{max-width:680px;margin:auto;padding:14px 14px 40px}
-.hero{text-align:center;padding:12px 0}
-.logo{
-  width:104px;height:104px;border-radius:26px;box-shadow:0 12px 30px rgba(0,0,0,.35);
-}
-h1{margin:10px 0 2px;font-size:34px}
-.tag{color:var(--muted);margin-bottom:16px}
-.card{
-  background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid #2b3754;
-  border-radius:20px;padding:16px;margin:12px 0;box-shadow:0 10px 28px rgba(0,0,0,.28)
-}
-label{display:block;color:#d8deea;font-weight:700;margin:8px 0 6px}
-input,textarea,select{
-  width:100%;border:1px solid #384665;background:#0d1425;color:#fff;
-  border-radius:14px;padding:14px;font-size:17px;outline:none
-}
-textarea{min-height:92px;resize:vertical}
-.row{display:flex;gap:10px}.row>*{flex:1}
-.btn{
-  width:100%;border:0;border-radius:14px;padding:14px 16px;font-size:17px;font-weight:800;
-  background:linear-gradient(180deg,#4da0ff,#1f67d2);color:#fff;margin-top:10px
-}
-.btn.gold{background:linear-gradient(180deg,#ffe487,#f3b620);color:#17120b}
-.btn.dark{background:#243149}
-.btn.red{background:#b91c1c}
-.quick{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
-.chip{
-  border:1px solid #41506e;background:#1a2339;color:#fff;border-radius:999px;
-  padding:9px 12px;font-weight:700
-}
-.item{padding:13px 0;border-bottom:1px solid rgba(255,255,255,.08)}
-.item:last-child{border-bottom:0}
-.item-title{font-size:18px;font-weight:800}
-.item-time{font-size:14px;color:var(--gold);margin-top:5px}
-.item-actions{display:flex;gap:8px;margin-top:10px}
-.item-actions button{flex:1;border:0;border-radius:10px;padding:10px;font-weight:800}
-.done{text-decoration:line-through;opacity:.55}
-.empty{color:var(--muted);text-align:center;padding:18px}
-.small{font-size:13px;color:var(--muted);line-height:1.45}
-.status{font-size:14px;color:#cbd5e1;margin-top:8px}
-@media(max-width:520px){h1{font-size:30px}.logo{width:92px;height:92px}.row{flex-direction:column}}
+:root{--bg:#0b1020;--card:#151d31;--card2:#1c2740;--text:#fff;--muted:#a9b3c7;--gold:#ffca4b}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#0b1020,#111827 45%,#0b1020);color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:680px;margin:auto;padding:14px 14px 40px}.hero{text-align:center;padding:12px 0}.logo{width:96px;height:96px;border-radius:24px}.card{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid #2b3754;border-radius:20px;padding:16px;margin:12px 0}
+h1{margin:8px 0 2px}.tag,.small{color:var(--muted)}label{display:block;font-weight:700;margin:8px 0 6px}textarea,input{width:100%;border:1px solid #384665;background:#0d1425;color:#fff;border-radius:14px;padding:14px;font-size:17px}
+textarea{min-height:92px}.btn{width:100%;border:0;border-radius:14px;padding:14px 16px;font-size:17px;font-weight:800;background:#2563eb;color:#fff;margin-top:10px}.listen{background:#059669}.gold{background:linear-gradient(#ffe487,#f3b620);color:#17120b}
+.row{display:flex;gap:10px}.row>*{flex:1}.status{margin-top:8px;color:#cbd5e1;min-height:20px}.detected{display:none;margin-top:8px;padding:10px;border-radius:12px;background:#0d1425;border:1px solid #384665;color:#dbeafe}
+.item{padding:13px 0;border-bottom:1px solid #ffffff14}.item-title{font-size:18px;font-weight:800}.item-time{font-size:14px;color:var(--gold);margin-top:5px}.item-actions{display:flex;gap:8px;margin-top:10px}.item-actions button{flex:1;border:0;border-radius:10px;padding:10px;font-weight:800}.empty{text-align:center;color:var(--muted);padding:18px}.version{position:fixed;right:10px;top:8px;font-size:10px;color:#94a3b8}
+@media(max-width:520px){.row{flex-direction:column}}
 </style>
 </head>
 <body>
+<div class="version">v20</div>
 <div class="wrap">
-  <div class="hero">
-    <img class="logo" src="icon-192.png" alt="Ikke glem">
-    <h1>Ikke glem</h1>
-    <div class="tag">Bare si det – så husker vi det for deg.</div>
-  </div>
+<div class="hero"><img class="logo" src="icon-192.png"><h1>Ikke glem</h1><div class="tag">Bare si det – så husker vi det for deg.</div></div>
 
-  <div class="card">
-    <label for="text">Hva skal du huske?</label>
-    <textarea id="text" placeholder="F.eks. Kjøp batterier i morgen kl. 08"></textarea>
+<div class="card">
+<label>Hva skal du huske?</label>
+<textarea id="text" placeholder="Lege klokken 8 i dag"></textarea>
+<button class="btn listen" id="speakBtn" onclick="startSpeech()">🎤 Si påminnelsen</button>
+<div id="detected" class="detected"></div>
+<label>Når?</label>
+<input id="when" type="datetime-local">
+<div class="row">
+<button class="btn" onclick="keyboardDictation()">⌨️ Tastatur-diktat</button>
+<button class="btn gold" onclick="saveReminder()">➕ Legg til</button>
+</div>
+<div id="status" class="status"></div>
+<div class="small">Eksempel: «Lege klokken 8 i dag», «Ring Petra i morgen klokken 9», «Kjøp melk om 30 minutter».</div>
+</div>
 
-    <div class="quick">
-      <button class="chip" onclick="quickTime(30)">Om 30 min</button>
-      <button class="chip" onclick="quickTime(60)">Om 1 time</button>
-      <button class="chip" onclick="tomorrowMorning()">I morgen 08:00</button>
-    </div>
-
-    <label for="when">Når?</label>
-    <input id="when" type="datetime-local">
-
-    <div class="row">
-      <button class="btn dark" onclick="useKeyboardDictation()">🎤 Diktat</button>
-      <button class="btn gold" onclick="saveReminder()">➕ Legg til</button>
-    </div>
-
-    <div id="status" class="status"></div>
-    <div class="small" style="margin-top:10px">
-      Testversjon: På iPhone bruker vi mikrofonen på tastaturet til diktat. Det er mye mer stabilt enn nettleserens talegjenkjenning.
-    </div>
-  </div>
-
-  <div class="card">
-    <h2 style="margin-top:0">Mine påminnelser</h2>
-    <div id="list"></div>
-  </div>
-
-  <div class="card">
-    <button class="btn dark" onclick="askNotificationPermission()">🔔 Tillat varsler</button>
-    <div class="small" style="margin-top:8px">
-      På iPhone: legg siden på Hjem-skjermen for best mulig test.
-    </div>
-  </div>
+<div class="card"><h2>Mine påminnelser</h2><div id="list"></div></div>
+<div class="card"><button class="btn" onclick="askNotificationPermission()">🔔 Tillat varsler</button></div>
 </div>
 
 <script>
-const KEY="ikke_glem_reminders_v1";
-let reminders=load();
-let timer=null;
-
-function load(){
-  try{return JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){return[]}
-}
+const KEY="ikke_glem_reminders_v2";
+let reminders=load(), timer=null, recognition=null;
+const $=id=>document.getElementById(id);
+function load(){try{return JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("ikke_glem_reminders_v1")||"[]")}catch(e){return[]}}
 function persist(){localStorage.setItem(KEY,JSON.stringify(reminders))}
-function fmt(ts){
-  const d=new Date(ts);
-  return d.toLocaleString("nb-NO",{dateStyle:"medium",timeStyle:"short"});
+function pad(n){return String(n).padStart(2,"0")}
+function fmt(ts){return new Date(ts).toLocaleString("nb-NO",{dateStyle:"medium",timeStyle:"short"})}
+function toLocal(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function num(s){const m={en:1,ett:1,to:2,tre:3,fire:4,fem:5,seks:6,sju:7,syv:7,"åtte":8,atte:8,ni:9,ti:10,elleve:11,tolv:12,tretten:13,fjorten:14,femten:15,seksten:16,sytten:17,atten:18,nitten:19,tjue:20};return /^\d+$/.test(s)?Number(s):m[s]}
+function timePart(t){
+ let m=t.match(/\b(?:klokken|klokka|kl\.?)\s*([0-2]?\d|[a-zæøå]+)(?:[:.]([0-5]\d))?\b/i);
+ if(m){const h=num(m[1].toLowerCase());if(Number.isInteger(h))return{h,min:Number(m[2]||0),raw:m[0]}}
+ m=t.match(/\bhalv\s+([0-2]?\d|[a-zæøå]+)\b/i);if(m){let h=num(m[1].toLowerCase());if(Number.isInteger(h))return{h:(h+23)%24,min:30,raw:m[0]}}
+ return null;
 }
-function esc(s){
-  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));
+function parseNatural(text){
+ const t=text.toLowerCase().trim(), now=new Date(); let d=new Date(now),m;
+ m=t.match(/\bom\s+(en|ett|\d+)\s*(?:minutt|minutter|min)\b/);if(m){const n=(m[1]==="en"||m[1]==="ett")?1:Number(m[1]);return{when:Date.now()+n*60000,clean:text.replace(m[0],"").trim()}}
+ m=t.match(/\bom\s+(en|ett|\d+)\s*(?:time|timer)\b/);if(m){const n=(m[1]==="en"||m[1]==="ett")?1:Number(m[1]);return{when:Date.now()+n*3600000,clean:text.replace(m[0],"").trim()}}
+ const hm=timePart(t); let off=null,raw="";
+ if(/\bi dag\b/.test(t)){off=0;raw="i dag"} else if(/\bi morgen\b/.test(t)){off=1;raw="i morgen"} else if(/\bovermorgen\b/.test(t)){off=2;raw="overmorgen"}
+ if(off!==null){d.setDate(d.getDate()+off);if(hm)d.setHours(hm.h,hm.min,0,0);else d.setHours(off===1?8:9,0,0,0);let clean=text;if(hm)clean=clean.replace(hm.raw,"");clean=clean.replace(raw,"").replace(/\s{2,}/g," ").trim();return{when:d.getTime(),clean}}
+ if(hm){d.setHours(hm.h,hm.min,0,0);if(d<=now)d.setDate(d.getDate()+1);return{when:d.getTime(),clean:text.replace(hm.raw,"").replace(/\s{2,}/g," ").trim()}}
+ return null;
 }
-function render(){
-  const box=document.getElementById("list");
-  const sorted=[...reminders].sort((a,b)=>a.when-b.when);
-  if(!sorted.length){box.innerHTML='<div class="empty">Ingen påminnelser ennå.</div>';return}
-  box.innerHTML=sorted.map(r=>`
-    <div class="item ${r.done?'done':''}">
-      <div class="item-title">${esc(r.text)}</div>
-      <div class="item-time">${fmt(r.when)}</div>
-      <div class="item-actions">
-        <button onclick="toggleDone('${r.id}')">${r.done?'↩️ Angre':'✅ Ferdig'}</button>
-        <button onclick="removeReminder('${r.id}')">🗑️ Slett</button>
-      </div>
-    </div>`).join("");
+function preview(){
+ const text=$("text").value.trim(), p=parseNatural(text), box=$("detected");
+ if(!text){box.style.display="none";return}
+ if(p){$("when").value=toLocal(new Date(p.when));box.textContent=`Forstått: ${p.clean||text} • ${fmt(p.when)}`;box.style.display="block"}
+ else{box.textContent="Jeg finner ingen tydelig tid ennå.";box.style.display="block"}
 }
-function setStatus(msg){document.getElementById("status").textContent=msg||""}
-function saveReminder(){
-  const text=document.getElementById("text").value.trim();
-  const whenVal=document.getElementById("when").value;
-  if(!text){setStatus("Skriv hva du skal huske.");return}
-  let when=whenVal?new Date(whenVal).getTime():parseNaturalTime(text);
-  if(!when || when<=Date.now()){setStatus("Velg et tidspunkt i fremtiden.");return}
-  reminders.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),text,when,done:false,fired:false});
-  persist();render();schedule();
-  document.getElementById("text").value="";
-  document.getElementById("when").value="";
-  setStatus("Lagret ✓");
+function saveReminder(auto=false){
+ const text=$("text").value.trim(); if(!text){$("status").textContent="Si eller skriv en påminnelse.";return}
+ const p=parseNatural(text), manual=$("when").value, when=manual?new Date(manual).getTime():(p&&p.when), title=(p&&p.clean)||text;
+ if(!when||when<=Date.now()){$("status").textContent='Jeg forstod ikke tidspunktet. Prøv «klokken 8 i dag».';return}
+ reminders.push({id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),text:title,when,done:false,fired:false});
+ persist();render();schedule();$("text").value="";$("when").value="";$("detected").style.display="none";$("status").textContent=auto?`Lagret automatisk ✓ ${fmt(when)}`:"Lagret ✓";
 }
-function toggleDone(id){
-  const r=reminders.find(x=>x.id===id); if(!r)return;
-  r.done=!r.done;persist();render();schedule();
+function startSpeech(){
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){keyboardDictation();return}
+ recognition=new SR();recognition.lang="nb-NO";recognition.interimResults=false;recognition.maxAlternatives=1;
+ $("speakBtn").textContent="🎙️ Lytter …";$("status").textContent="Snakk nå.";
+ recognition.onresult=e=>{const spoken=e.results[0][0].transcript.trim();$("text").value=spoken;preview();if(parseNatural(spoken))saveReminder(true);else $("status").textContent="Jeg hørte deg, men forstod ikke tidspunktet."};
+ recognition.onerror=()=>{$("status").textContent="Talegjenkjenning feilet. Bruk tastatur-diktat."};
+ recognition.onend=()=>{$("speakBtn").textContent="🎤 Si påminnelsen"};
+ recognition.start();
 }
-function removeReminder(id){
-  reminders=reminders.filter(x=>x.id!==id);persist();render();schedule();
-}
-function quickTime(mins){
-  const d=new Date(Date.now()+mins*60000);
-  document.getElementById("when").value=toLocalInput(d);
-}
-function tomorrowMorning(){
-  const d=new Date();d.setDate(d.getDate()+1);d.setHours(8,0,0,0);
-  document.getElementById("when").value=toLocalInput(d);
-}
-function toLocalInput(d){
-  const pad=n=>String(n).padStart(2,"0");
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-function parseNaturalTime(text){
-  const t=text.toLowerCase();
-  const now=new Date();
-  let d=new Date(now);
-  let m;
-  if((m=t.match(/om\s+(\d+)\s*min/))){d=new Date(Date.now()+Number(m[1])*60000);return d.getTime()}
-  if((m=t.match(/om\s+(\d+)\s*time/))){d=new Date(Date.now()+Number(m[1])*3600000);return d.getTime()}
-  if(t.includes("i morgen")){
-    d.setDate(d.getDate()+1);
-    d.setHours(8,0,0,0);
-    if((m=t.match(/kl\.?\s*(\d{1,2})(?::(\d{2}))?/))){
-      d.setHours(Number(m[1]),Number(m[2]||0),0,0);
-    }
-    return d.getTime();
-  }
-  if((m=t.match(/kl\.?\s*(\d{1,2})(?::(\d{2}))?/))){
-    d.setHours(Number(m[1]),Number(m[2]||0),0,0);
-    if(d.getTime()<=Date.now())d.setDate(d.getDate()+1);
-    return d.getTime();
-  }
-  return null;
-}
-async function askNotificationPermission(){
-  if(!("Notification" in window)){setStatus("Varsler støttes ikke her.");return}
-  const p=await Notification.requestPermission();
-  setStatus(p==="granted"?"Varsler er tillatt ✓":"Varsler ble ikke tillatt.");
-}
-function fire(r){
-  r.fired=true;persist();
-  if("Notification" in window && Notification.permission==="granted"){
-    new Notification("Ikke glem",{body:r.text,icon:"icon-192.png"});
-  }else{
-    alert("Ikke glem!\n\n"+r.text);
-  }
-}
-function schedule(){
-  if(timer)clearInterval(timer);
-  timer=setInterval(()=>{
-    const now=Date.now();
-    let changed=false;
-    reminders.forEach(r=>{
-      if(!r.done && !r.fired && r.when<=now){fire(r);changed=true}
-    });
-    if(changed)render();
-  },5000);
-}
-function useKeyboardDictation(){
-  const field=document.getElementById("text");
-  field.focus();
-  setStatus("Trykk på mikrofonen på iPhone-tastaturet og snakk.");
-}
-if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{})}
+function keyboardDictation(){$("text").focus();$("status").textContent="Trykk på mikrofonen på iPhone-tastaturet og si hele påminnelsen."}
+function render(){const b=$("list"),s=[...reminders].sort((a,b)=>a.when-b.when);if(!s.length){b.innerHTML='<div class="empty">Ingen påminnelser ennå.</div>';return}b.innerHTML=s.map(r=>`<div class="item"><div class="item-title">${esc(r.text)}</div><div class="item-time">${fmt(r.when)}</div><div class="item-actions"><button onclick="done('${r.id}')">✅ Ferdig</button><button onclick="del('${r.id}')">🗑️ Slett</button></div></div>`).join("")}
+function done(id){const r=reminders.find(x=>x.id===id);if(r){r.done=true;persist();render()}}
+function del(id){reminders=reminders.filter(x=>x.id!==id);persist();render()}
+async function askNotificationPermission(){if(!("Notification" in window)){$("status").textContent="Varsler støttes ikke her.";return}const p=await Notification.requestPermission();$("status").textContent=p==="granted"?"Varsler er tillatt ✓":"Varsler ble ikke tillatt."}
+function fire(r){r.fired=true;persist();if("Notification"in window&&Notification.permission==="granted")new Notification("Ikke glem",{body:r.text,icon:"icon-192.png"});else alert("Ikke glem!\n\n"+r.text)}
+function schedule(){if(timer)clearInterval(timer);timer=setInterval(()=>{const n=Date.now();reminders.forEach(r=>{if(!r.done&&!r.fired&&r.when<=n)fire(r)})},5000)}
+$("text").addEventListener("input",preview);
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 render();schedule();
 </script>
-</body>
-</html>
+</body></html>
