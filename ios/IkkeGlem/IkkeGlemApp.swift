@@ -1,5 +1,7 @@
 import SwiftUI
 import UIKit
+import MapKit
+import CoreLocation
 import Speech
 import AVFoundation
 import UserNotifications
@@ -15,6 +17,9 @@ struct Reminder: Identifiable, Codable {
     let title: String
     let appointment: Date
     let alert: Date
+    var address: String? = nil
+    var latitude: Double? = nil
+    var longitude: Double? = nil
 }
 
 struct ContentView: View {
@@ -40,6 +45,10 @@ struct ContentView: View {
                             Text(reminder.title).font(.headline)
                             Text("Avtale: \(reminder.appointment.formatted(date: .abbreviated, time: .shortened))")
                             Text("Varsel: \(reminder.alert.formatted(date: .abbreviated, time: .shortened))").foregroundStyle(.yellow)
+                            if let address = reminder.address {
+                                Text(address).font(.subheadline)
+                                Button { model.openMaps(reminder) } label: { Label("Åpne i Maps", systemImage: "map") }.buttonStyle(.borderless)
+                            }
                         }.listRowBackground(Color.white.opacity(0.06))
                         .swipeActions { Button("Slett", role: .destructive) { model.remove(reminder) } }
                     }
@@ -152,8 +161,9 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
 
     private func finish() {
         let spoken = transcript
+        let input = NorwegianDateParser.splitAddress(spoken)
         stop()
-        guard let parsed = NorwegianDateParser.parse(spoken), parsed.date > Date() else {
+        guard let parsed = NorwegianDateParser.parse(input.text), parsed.date > Date() else {
             status = "Jeg forstod ikke tidspunktet. Prøv: Legen klokken åtte i morgen."
             return
         }
@@ -167,7 +177,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
             guard settings.authorizationStatus == .authorized else { status = "Varsler er slått av. Tillat varsler i Innstillinger."; return }
             // If the appointment is less than an hour away, notify shortly instead of scheduling a past date.
             let alert = max(parsed.date.addingTimeInterval(-3600), Date().addingTimeInterval(5))
-            let reminder = Reminder(id: UUID(), title: parsed.title, appointment: parsed.date, alert: alert)
+            let reminder = Reminder(id: UUID(), title: parsed.title, appointment: parsed.date, alert: alert, address: input.address)
             let content = UNMutableNotificationContent()
             content.title = "ikke glem by MP"
             content.body = "\(parsed.title) klokken \(parsed.date.formatted(date: .omitted, time: .shortened))"
@@ -179,9 +189,41 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
                 try await center.add(UNNotificationRequest(identifier: reminder.id.uuidString, content: content, trigger: trigger))
                 reminders.append(reminder)
                 persist()
+                if let address = input.address { resolveAddress(address, id: reminder.id) }
                 status = "Lagret ✓ Varsel \(alert.formatted(date: .abbreviated, time: .shortened))."
                 if alert > parsed.date.addingTimeInterval(-3600) { status += " Avtalen er mindre enn én time unna, så varsler jeg straks." }
             } catch { status = "Kunne ikke lagre varselet: \(error.localizedDescription)" }
+        }
+    }
+
+    private func resolveAddress(_ address: String, id: UUID) {
+        Task {
+            do {
+                let places = try await CLGeocoder().geocodeAddressString(address)
+                guard let index = reminders.firstIndex(where: { $0.id == id }) else { return }
+                // Keep ambiguous results as a Maps search instead of choosing an arbitrary location.
+                guard places.count == 1, let location = places.first?.location else {
+                    status += " Adressen er ikke entydig; Maps-knappen søker etter den."
+                    return
+                }
+                reminders[index].latitude = location.coordinate.latitude
+                reminders[index].longitude = location.coordinate.longitude
+                persist()
+            } catch {
+                if reminders.contains(where: { $0.id == id }) { status += " Adressen er lagret; Maps-knappen kan søke etter den." }
+            }
+        }
+    }
+
+    func openMaps(_ reminder: Reminder) {
+        if let latitude = reminder.latitude, let longitude = reminder.longitude {
+            let item = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude)))
+            item.name = reminder.address ?? reminder.title
+            item.openInMaps()
+        } else if let address = reminder.address {
+            var components = URLComponents(string: "https://maps.apple.com/")!
+            components.queryItems = [URLQueryItem(name: "q", value: address)]
+            if let url = components.url { UIApplication.shared.open(url) }
         }
     }
 
