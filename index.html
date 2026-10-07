@@ -19,7 +19,7 @@ textarea{min-height:92px}.btn{width:100%;border:0;border-radius:14px;padding:14p
 </style>
 </head>
 <body>
-<div class="version">v22</div>
+<div class="version">v23</div>
 <div class="wrap">
 <div class="hero"><img class="logo" src="icon-192.png"><h1>Ikke glem</h1><div class="tag">Bare si det – så husker vi det for deg.</div></div>
 
@@ -35,7 +35,7 @@ textarea{min-height:92px}.btn{width:100%;border:0;border-radius:14px;padding:14p
 <button class="btn gold" onclick="saveReminder()">➕ Legg til</button>
 </div>
 <div id="status" class="status"></div>
-<div class="small">Når du lagrer, lastes en kalenderfil ned. Åpne den og bekreft «Legg til i Kalender» for alarm når appen er lukket.</div>
+<div class="small">Ett trykk: Si «Legen klokken 8». Påminnelsen lagres automatisk med alarm én time før. Kalenderfilen lastes ned. Åpne den og bekreft «Legg til i Kalender» for alarm når appen er lukket.</div>
 <div class="small">Eksempel: «Lege klokken 8 i dag», «Ring Petra i morgen klokken 9», «Kjøp melk om 30 minutter».</div>
 </div>
 
@@ -55,8 +55,8 @@ function toLocal(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.ge
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function num(s){const m={en:1,ett:1,to:2,tre:3,fire:4,fem:5,seks:6,sju:7,syv:7,"åtte":8,atte:8,ni:9,ti:10,elleve:11,tolv:12,tretten:13,fjorten:14,femten:15,seksten:16,sytten:17,atten:18,nitten:19,tjue:20};return /^\d+$/.test(s)?Number(s):m[s]}
 function timePart(t){
- let m=t.match(/\b(?:klokken|klokka|kl\.?)\s*([0-2]?\d|[a-zæøå]+)(?:[:.]([0-5]\d))?\b/i);
- if(m){const h=num(m[1].toLowerCase());if(Number.isInteger(h))return{h,min:Number(m[2]||0),raw:m[0]}}
+ let m=t.match(/\b(?:klokken|klocken|klokka|kl\.?)\s*([0-2]?\d|[a-zæøå]+)(?:[:.]([0-5]\d))?\b/i);
+ if(m){const h=num(m[1].toLowerCase());if(Number.isInteger(h)&&h>=0&&h<24)return{h,min:Number(m[2]||0),raw:m[0]}}
  m=t.match(/\bhalv\s+([0-2]?\d|[a-zæøå]+)\b/i);if(m){let h=num(m[1].toLowerCase());if(Number.isInteger(h))return{h:(h+23)%24,min:30,raw:m[0]}}
  return null;
 }
@@ -80,8 +80,8 @@ function saveReminder(auto=false){
  const text=$("text").value.trim(); if(!text){$("status").textContent="Si eller skriv en påminnelse.";return}
  const p=parseNatural(text), manual=$("when").value, when=manual?new Date(manual).getTime():(p&&p.when), title=(p&&p.clean)||text;
  if(!when||when<=Date.now()){$("status").textContent='Jeg forstod ikke tidspunktet. Prøv «klokken 8 i dag».';return}
- const reminder={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),text:title,when,done:false,fired:false};
- reminders.push(reminder);persist();render();schedule();$("text").value="";$("when").value="";$("detected").style.display="none";$("status").textContent="Lagret ✓ Åpne kalenderfilen og bekreft Legg til i Kalender.";
+ const reminder={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),text:title,when,alertAt:when-3600000,done:false,fired:false};
+ reminders.push(reminder);persist();render();schedule();$("text").value="";$("when").value="";$("detected").style.display="none";$("status").textContent=`Lagret ${auto?"automatisk ":""}✓ Avtale: ${fmt(when)} • Alarm: ${fmt(when-3600000)}. Bekreft kalenderfilen for alarm når appen er lukket.`;
  downloadCalendar(reminder);
 }
 function startSpeech(){
@@ -89,10 +89,11 @@ function startSpeech(){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){$("status").textContent="Åpne appen i Safari. Talegjenkjenning er ikke tilgjengelig i denne nettleseren.";return}
  const rec=new SR(); recognition=rec;rec.lang="nb-NO";rec.continuous=false;rec.interimResults=true;rec.maxAlternatives=1;
- let heard=false;
+ let heard=false, saved=false;
+ $("text").value="";$("when").value="";
  function reset(){clearTimeout(speechTimeout);if(recognition===rec)recognition=null;$("speakBtn").textContent="🎤 Snakk norsk"}
  rec.onstart=()=>{$("speakBtn").textContent="⏹️ Stopp";$("status").textContent="Lytter på norsk …"};
- rec.onresult=e=>{let spoken="";for(let i=0;i<e.results.length;i++)spoken+=e.results[i][0].transcript+" ";heard=true;$("text").value=spoken.trim();preview();$("status").textContent="Kontroller teksten og tiden, og trykk Legg til."};
+ rec.onresult=e=>{let spoken="";for(let i=0;i<e.results.length;i++)spoken+=e.results[i][0].transcript+" ";if(saved)return;heard=true;$("text").value=spoken.trim();preview();if(Array.from(e.results).every(r=>r.isFinal)){if(parseNatural(spoken)){saved=true;saveReminder(true);rec.stop()}else $("status").textContent="Jeg forstod ikke tiden. Si for eksempel: Legen klokken åtte i morgen."}else $("status").textContent="Lytter på norsk …";};
  rec.onerror=e=>{reset();const messages={"not-allowed":"Tillat mikrofon og talegjenkjenning i Safari. Kontroller også at Siri er aktivert.","service-not-allowed":"Talegjenkjenning er ikke tillatt. Åpne i Safari og kontroller Siri-innstillingene.","language-not-supported":"Norsk talegjenkjenning er ikke tilgjengelig på denne enheten.","no-speech":"Jeg hørte ingen tale. Trykk Snakk norsk og prøv igjen.","network":"Talegjenkjenningen fikk en nettverksfeil. Prøv igjen."};$("status").textContent=messages[e.error]||"Talegjenkjenning feilet: "+e.error};
  rec.onend=()=>{reset();if(!heard&&$("status").textContent==="Lytter på norsk …")$("status").textContent="Ingen tale ble registrert. Trykk Snakk norsk og prøv igjen."};
  $("status").textContent="Starter norsk talegjenkjenning …";
@@ -105,18 +106,18 @@ function downloadCalendar(r){
  const start=new Date(r.when), end=new Date(r.when+15*60000);
  const lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Ikke glem//NO","CALSCALE:GREGORIAN","METHOD:PUBLISH","BEGIN:VEVENT",
   "UID:"+r.id+"@ikke-glem","DTSTAMP:"+icsDate(new Date()),"DTSTART:"+icsDate(start),"DTEND:"+icsDate(end),
-  "SUMMARY:"+icsEscape(r.text),"DESCRIPTION:Påminnelse fra Ikke glem","BEGIN:VALARM","TRIGGER:-PT5M","ACTION:DISPLAY","DESCRIPTION:"+icsEscape(r.text),"END:VALARM","END:VEVENT","END:VCALENDAR"];
+  "SUMMARY:"+icsEscape(r.text),"DESCRIPTION:Påminnelse fra Ikke glem","BEGIN:VALARM","TRIGGER:-PT1H","ACTION:DISPLAY","DESCRIPTION:"+icsEscape(r.text),"END:VALARM","END:VEVENT","END:VCALENDAR"];
  const blob=new Blob([lines.join("\r\n")+"\r\n"],{type:"text/calendar;charset=utf-8"});
  const url=URL.createObjectURL(blob), a=document.createElement("a");
  a.href=url;a.download="ikke-glem-"+new Date(r.when).toISOString().slice(0,10)+".ics";document.body.appendChild(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
 function calendarById(id){const r=reminders.find(x=>x.id===id);if(r)downloadCalendar(r)}
-function render(){const b=$("list"),s=[...reminders].sort((a,b)=>a.when-b.when);if(!s.length){b.innerHTML='<div class="empty">Ingen påminnelser ennå.</div>';return}b.innerHTML=s.map(r=>`<div class="item"><div class="item-title">${esc(r.text)}</div><div class="item-time">${fmt(r.when)}</div><div class="item-actions"><button onclick="calendarById('${r.id}')">📅 Kalender</button><button onclick="done('${r.id}')">✅ Ferdig</button><button onclick="del('${r.id}')">🗑️ Slett</button></div></div>`).join("")}
+function render(){const b=$("list"),s=[...reminders].sort((a,b)=>a.when-b.when);if(!s.length){b.innerHTML='<div class="empty">Ingen påminnelser ennå.</div>';return}b.innerHTML=s.map(r=>`<div class="item"><div class="item-title">${esc(r.text)}</div><div class="item-time">Avtale: ${fmt(r.when)} • Alarm: ${fmt(r.alertAt??r.when)}</div><div class="item-actions"><button onclick="calendarById('${r.id}')">📅 Kalender</button><button onclick="done('${r.id}')">✅ Ferdig</button><button onclick="del('${r.id}')">🗑️ Slett</button></div></div>`).join("")}
 function done(id){const r=reminders.find(x=>x.id===id);if(r){r.done=true;persist();render()}}
 function del(id){reminders=reminders.filter(x=>x.id!==id);persist();render()}
 function fire(r){r.fired=true;persist();if(document.visibilityState==="visible")alert("Ikke glem!\n\n"+r.text)}
-function schedule(){if(timer)clearInterval(timer);timer=setInterval(()=>{const n=Date.now();reminders.forEach(r=>{if(!r.done&&!r.fired&&r.when<=n)fire(r)})},5000)}
+function schedule(){if(timer)clearInterval(timer);timer=setInterval(()=>{const n=Date.now();reminders.forEach(r=>{if(!r.done&&!r.fired&&(r.alertAt??r.when)<=n)fire(r)})},5000)}
 $("text").addEventListener("input",preview);
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 render();schedule();
