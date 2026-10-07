@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>nb</string>
 	<key>CFBundleDisplayName</key>
-	<string>Ikke glem</string>
+	<string>ikke glem by MP</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
