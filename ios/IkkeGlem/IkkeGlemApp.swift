@@ -23,7 +23,7 @@ struct ContentView: View {
         ZStack {
             Color(red: 0.04, green: 0.07, blue: 0.14).ignoresSafeArea()
             VStack(spacing: 22) {
-                Text("Ikke glem").font(.largeTitle.bold())
+                Text("ikke glem by MP").font(.largeTitle.bold())
                 Text("Ett trykk. Si det. Ferdig.").foregroundStyle(.secondary)
                 Button { model.tap() } label: {
                     Label(model.listening ? "Lytter …" : "Snakk", systemImage: "mic.fill")
@@ -169,7 +169,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
             let alert = max(parsed.date.addingTimeInterval(-3600), Date().addingTimeInterval(5))
             let reminder = Reminder(id: UUID(), title: parsed.title, appointment: parsed.date, alert: alert)
             let content = UNMutableNotificationContent()
-            content.title = "Ikke glem"
+            content.title = "ikke glem by MP"
             content.body = "\(parsed.title) klokken \(parsed.date.formatted(date: .omitted, time: .shortened))"
             content.sound = .default
             var components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: alert)
