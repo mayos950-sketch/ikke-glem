@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import MapKit
 import CoreLocation
+import EventKit
 import Speech
 import AVFoundation
 import UserNotifications
@@ -20,16 +21,19 @@ struct Reminder: Identifiable, Codable {
     var address: String? = nil
     var latitude: Double? = nil
     var longitude: Double? = nil
+    var calendarEventID: String? = nil
 }
 
 struct ContentView: View {
     @ObservedObject var model: ReminderModel
+    @State private var showCalendars = false
     var body: some View {
         ZStack {
             Color(red: 0.04, green: 0.07, blue: 0.14).ignoresSafeArea()
             VStack(spacing: 22) {
                 Text("ikke glem by MP").font(.largeTitle.bold())
-                Text("Ett trykk. Si det. Ferdig. · v1.4").foregroundStyle(.secondary)
+                Text("Ett trykk. Si det. Ferdig. · v1.5").foregroundStyle(.secondary)
+                Button { showCalendars = true } label: { Label("Kalender", systemImage: "calendar.badge.plus") }.disabled(model.busy || model.listening)
                 Button { model.tap() } label: {
                     ZStack {
                         Image("VoiceButton").resizable().scaledToFit().frame(height: 130)
@@ -58,6 +62,37 @@ struct ContentView: View {
                 }.scrollContentBackground(.hidden).listStyle(.plain)
             }.padding()
         }.preferredColorScheme(.dark)
+            .sheet(isPresented: $showCalendars) {
+                NavigationStack {
+                    List {
+                        Section {
+                            Button("Ikke lagre i kalender") { model.selectCalendar(nil); showCalendars = false }
+                            ForEach(model.calendars, id: \.calendarIdentifier) { calendar in
+                                Button {
+                                    model.selectCalendar(calendar)
+                                    showCalendars = false
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text(calendar.title)
+                                            Text(calendar.source.title).font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        if model.selectedCalendarID == calendar.calendarIdentifier { Image(systemName: "checkmark") }
+                                    }
+                                }
+                            }
+                        } header: { Text("Velg kalender for automatisk lagring") }
+                        Section {
+                            Text(model.calendarStatus)
+                            Text("Google-kontoen må være lagt til under iPhone-innstillinger → Apper → Kalender → Kalenderkontoer. Velg deretter kalenderen fra Google-kontoen her.")
+                            Text("Avtaler lagres i den valgte kalenderen. Fanfaren kommer fra denne appen.")
+                        }
+                    }.navigationTitle("Kalender")
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Ferdig") { showCalendars = false } } }
+                        .task { await model.loadCalendars() }
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in model.interrupted() }
     }
 }
@@ -67,8 +102,13 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
     @Published var reminders: [Reminder] = []
     @Published var listening = false
     @Published var busy = false
+    @Published var calendars: [EKCalendar] = []
+    @Published var selectedCalendarID = ""
+    @Published var calendarStatus = "Velg en kalender. Nye avtaler lagres automatisk der."
     @Published var transcript = ""
     @Published var status = "Si: Legen klokken åtte i morgen, minn meg på det 30 minutter før."
+    private let calendarStore = EKEventStore()
+    private let calendarKey = "ikke-glem-selected-calendar"
     private let engine = AVAudioEngine()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var recognition: SFSpeechRecognitionTask?
@@ -82,6 +122,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
         super.init()
         if let data = UserDefaults.standard.data(forKey: storage),
            let saved = try? JSONDecoder().decode([Reminder].self, from: data) { reminders = saved }
+        selectedCalendarID = UserDefaults.standard.string(forKey: calendarKey) ?? ""
         UNUserNotificationCenter.current().delegate = self
     }
 
@@ -180,7 +221,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
             guard settings.authorizationStatus == .authorized else { status = "Varsler er slått av. Tillat varsler i Innstillinger."; return }
             let alert = spokenReminder.alert
             guard alert > Date() else { status = "Varseltiden har allerede passert. Prøv igjen med en senere tid."; return }
-            let reminder = Reminder(id: UUID(), title: parsed.title, appointment: parsed.date, alert: alert, address: spokenReminder.address)
+            var reminder = Reminder(id: UUID(), title: parsed.title, appointment: parsed.date, alert: alert, address: spokenReminder.address)
             let content = UNMutableNotificationContent()
             content.title = "ikke glem by MP"
             content.body = "\(parsed.title) klokken \(parsed.date.formatted(date: .omitted, time: .shortened))"
@@ -190,13 +231,57 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
             do {
                 try await center.add(UNNotificationRequest(identifier: reminder.id.uuidString, content: content, trigger: trigger))
+                let calendarResult = saveToCalendar(&reminder)
                 reminders.append(reminder)
                 persist()
                 if let address = spokenReminder.address { resolveAddress(address, id: reminder.id) }
-                status = "Lagret ✓ Varsel \(alert.formatted(date: .abbreviated, time: .shortened))."
+                status = "Lagret ✓ Varsel \(alert.formatted(date: .abbreviated, time: .shortened))." + calendarResult
                 if spokenReminder.usedDefault { status += " Uten oppgitt varseltid brukes én time før, eller straks hvis den tiden er passert." }
             } catch { status = "Kunne ikke lagre varselet: \(error.localizedDescription)" }
         }
+    }
+
+    private var calendarAccess: Bool {
+        if #available(iOS 17.0, *) { return EKEventStore.authorizationStatus(for: .event) == .fullAccess }
+        return EKEventStore.authorizationStatus(for: .event) == .authorized
+    }
+    func loadCalendars() async {
+        do {
+            let granted: Bool
+            if #available(iOS 17.0, *) { granted = try await calendarStore.requestFullAccessToEvents() }
+            else { granted = try await calendarStore.requestAccess(to: .event) }
+            guard granted else {
+                calendars = []
+                calendarStatus = "Kalendertilgang er avslått. Du kan gi tilgang i Innstillinger → Apper → ikke glem by MP."
+                return
+            }
+            calendars = calendarStore.calendars(for: .event).filter { $0.allowsContentModifications }.sorted { $0.source.title + $0.title < $1.source.title + $1.title }
+            calendarStatus = calendars.isEmpty ? "Ingen skrivbar kalender er tilgjengelig. Legg til Google-kontoen i iPhone-innstillingene." : "Velg Google-kalenderen under riktig konto. Bare nye avtaler lagres."
+        } catch { calendars = []; calendarStatus = "Kunne ikke hente kalendere: \(error.localizedDescription)" }
+    }
+    func selectCalendar(_ calendar: EKCalendar?) {
+        selectedCalendarID = calendar?.calendarIdentifier ?? ""
+        UserDefaults.standard.set(selectedCalendarID, forKey: calendarKey)
+        calendarStatus = calendar.map { "Lagrer nye avtaler i \($0.title) · \($0.source.title)." } ?? "Automatisk kalenderlagring er slått av."
+    }
+    private func saveToCalendar(_ reminder: inout Reminder) -> String {
+        guard !selectedCalendarID.isEmpty else { return "" }
+        guard calendarAccess, let calendar = calendarStore.calendar(withIdentifier: selectedCalendarID), calendar.allowsContentModifications else {
+            return " Kalenderen kunne ikke brukes; velg den på nytt under Kalender. App-varselet er lagret."
+        }
+        let event = EKEvent(eventStore: calendarStore)
+        event.title = reminder.title
+        event.startDate = reminder.appointment
+        event.endDate = reminder.appointment.addingTimeInterval(1800)
+        event.location = reminder.address
+        event.calendar = calendar
+        event.notes = "Lagt til av ikke glem by MP."
+        event.alarms = []
+        do {
+            try calendarStore.save(event, span: .thisEvent)
+            reminder.calendarEventID = event.eventIdentifier
+            return " Lagt til i \(calendar.title)."
+        } catch { return " Kalenderlagring feilet: \(error.localizedDescription). App-varselet er lagret." }
     }
 
     private func resolveAddress(_ address: String, id: UUID) {
@@ -243,6 +328,11 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
     }
     func interrupted() { if listening { stop(); status = "Opptaket ble avbrutt. Trykk Snakk og prøv igjen." } }
     func remove(_ reminder: Reminder) {
+        if let id = reminder.calendarEventID, calendarAccess, let event = calendarStore.event(withIdentifier: id) {
+            do { try calendarStore.remove(event, span: .thisEvent) }
+            catch { status = "Kalenderavtalen kunne ikke slettes: \(error.localizedDescription)" }
+        }
+
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [reminder.id.uuidString])
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [reminder.id.uuidString])
         reminders.removeAll { $0.id == reminder.id }; persist()
