@@ -65,7 +65,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
     @Published var listening = false
     @Published var busy = false
     @Published var transcript = ""
-    @Published var status = "Si for eksempel: Legen klokken åtte i morgen. Varsel én time før."
+    @Published var status = "Si: Legen klokken åtte i morgen, minn meg på det 30 minutter før."
     private let engine = AVAudioEngine()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var recognition: SFSpeechRecognitionTask?
@@ -161,12 +161,12 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
 
     private func finish() {
         let spoken = transcript
-        let input = NorwegianDateParser.splitAddress(spoken)
         stop()
-        guard let parsed = NorwegianDateParser.parse(input.text), parsed.date > Date() else {
-            status = "Jeg forstod ikke tidspunktet. Prøv: Legen klokken åtte i morgen."
+        guard let spokenReminder = NorwegianDateParser.parseSpoken(spoken) else {
+            status = "Jeg forstod ikke avtalen eller varseltiden. Prøv: Legen klokken åtte i morgen, minn meg på det 30 minutter før. Varseltiden må være i fremtiden."
             return
         }
+        let parsed = spokenReminder.appointment
         busy = true
         Task {
             defer { busy = false }
@@ -175,9 +175,9 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
             guard pending.count < 60 else { status = "For mange aktive varsler. Slett en påminnelse først."; return }
             let settings = await center.notificationSettings()
             guard settings.authorizationStatus == .authorized else { status = "Varsler er slått av. Tillat varsler i Innstillinger."; return }
-            // If the appointment is less than an hour away, notify shortly instead of scheduling a past date.
-            let alert = max(parsed.date.addingTimeInterval(-3600), Date().addingTimeInterval(5))
-            let reminder = Reminder(id: UUID(), title: parsed.title, appointment: parsed.date, alert: alert, address: input.address)
+            let alert = spokenReminder.alert
+            guard alert > Date() else { status = "Varseltiden har allerede passert. Prøv igjen med en senere tid."; return }
+            let reminder = Reminder(id: UUID(), title: parsed.title, appointment: parsed.date, alert: alert, address: spokenReminder.address)
             let content = UNMutableNotificationContent()
             content.title = "ikke glem by MP"
             content.body = "\(parsed.title) klokken \(parsed.date.formatted(date: .omitted, time: .shortened))"
@@ -189,9 +189,9 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
                 try await center.add(UNNotificationRequest(identifier: reminder.id.uuidString, content: content, trigger: trigger))
                 reminders.append(reminder)
                 persist()
-                if let address = input.address { resolveAddress(address, id: reminder.id) }
+                if let address = spokenReminder.address { resolveAddress(address, id: reminder.id) }
                 status = "Lagret ✓ Varsel \(alert.formatted(date: .abbreviated, time: .shortened))."
-                if alert > parsed.date.addingTimeInterval(-3600) { status += " Avtalen er mindre enn én time unna, så varsler jeg straks." }
+                if spokenReminder.usedDefault { status += " Uten oppgitt varseltid brukes én time før, eller straks hvis den tiden er passert." }
             } catch { status = "Kunne ikke lagre varselet: \(error.localizedDescription)" }
         }
     }
