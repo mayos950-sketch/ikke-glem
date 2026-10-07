@@ -1,5 +1,7 @@
 // !$*UTF8*$!
 { archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
+000000000000000000000031 = { isa = PBXShellScriptBuildPhase; buildActionMask = 2147483647; files = (); inputPaths = ("$(SRCROOT)/IkkeGlem/fanfare.b64"); outputPaths = ("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ikke-glem-fanfare.wav"); name = "Bundle reminder fanfare"; runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/sh; shellScript = "mkdir -p \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\n/usr/bin/base64 -D -i \"$SRCROOT/IkkeGlem/fanfare.b64\" -o \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/ikke-glem-fanfare.wav\"\n"; };
+
 000000000000000000000020 = { isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 000000000000000000000021 = { isa = PBXBuildFile; fileRef = 000000000000000000000020; };
 
@@ -7,7 +9,7 @@
 000000000000000000000002 = { isa = PBXGroup; children = (000000000000000000000003, 000000000000000000000004); sourceTree = "<group>"; };
 000000000000000000000003 = { isa = PBXGroup; children = (00000000000000000000000A, 00000000000000000000000B, 000000000000000000000020); path = IkkeGlem; sourceTree = "<group>"; };
 000000000000000000000004 = { isa = PBXGroup; children = (000000000000000000000006); name = Products; sourceTree = "<group>"; };
-000000000000000000000005 = { isa = PBXNativeTarget; buildConfigurationList = 00000000000000000000000F; buildPhases = (000000000000000000000007, 000000000000000000000009, 000000000000000000000008); buildRules = (); dependencies = (); name = IkkeGlem; productName = IkkeGlem; productReference = 000000000000000000000006; productType = "com.apple.product-type.application"; };
+000000000000000000000005 = { isa = PBXNativeTarget; buildConfigurationList = 00000000000000000000000F; buildPhases = (000000000000000000000007, 000000000000000000000009, 000000000000000000000008, 000000000000000000000031); buildRules = (); dependencies = (); name = IkkeGlem; productName = IkkeGlem; productReference = 000000000000000000000006; productType = "com.apple.product-type.application"; };
 000000000000000000000006 = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IkkeGlem.app; sourceTree = BUILT_PRODUCTS_DIR; };
 000000000000000000000007 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (00000000000000000000000C, 00000000000000000000000D); runOnlyForDeploymentPostprocessing = 0; };
 000000000000000000000008 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000021); runOnlyForDeploymentPostprocessing = 0; };
