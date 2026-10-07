@@ -1,6 +1,15 @@
 import Foundation
 
 enum NorwegianDateParser {
+    static func splitAddress(_ input: String) -> (text: String, address: String?) {
+        let pattern = #"\b(?:på adressen|adressen er|adresse|adressen)\s*[:,-]?\s+"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+              let match = regex.firstMatch(in: input, range: NSRange(input.startIndex..., in: input)),
+              let range = Range(match.range, in: input) else { return (input, nil) }
+        let address = String(input[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+        guard !address.isEmpty else { return (input, nil) }
+        return (String(input[..<range.lowerBound]), address)
+    }
     struct Parsed { let title: String; let date: Date }
     static func parse(_ input: String, now: Date = Date(), calendar: Calendar = .current) -> Parsed? {
         let text = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
