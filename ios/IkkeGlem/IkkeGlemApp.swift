@@ -29,7 +29,7 @@ struct ContentView: View {
             Color(red: 0.04, green: 0.07, blue: 0.14).ignoresSafeArea()
             VStack(spacing: 22) {
                 Text("ikke glem by MP").font(.largeTitle.bold())
-                Text("Ett trykk. Si det. Ferdig. · v1.3").foregroundStyle(.secondary)
+                Text("Ett trykk. Si det. Ferdig. · v1.4").foregroundStyle(.secondary)
                 Button { model.tap() } label: {
                     ZStack {
                         Image("VoiceButton").resizable().scaledToFit().frame(height: 130)

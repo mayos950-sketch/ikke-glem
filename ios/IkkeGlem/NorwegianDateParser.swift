@@ -27,7 +27,7 @@ enum NorwegianDateParser {
             guard let parsed = parse(direct.text, now: now, calendar: calendar), parsed.date > now else { return nil }
             return SpokenReminder(appointment: parsed, alert: parsed.date, address: direct.address, usedDefault: false)
         }
-        if range == nil, let bare = parse(input, now: now, calendar: calendar), bare.title == "Påminnelse", bare.date > now {
+        if range == nil, let bare = parse(input, now: now, calendar: calendar), (bare.title == "Påminnelse" || input.lowercased().range(of: #"\bom\s+"#, options: .regularExpression) != nil), bare.date > now {
             return SpokenReminder(appointment: bare, alert: bare.date, address: nil, usedDefault: false)
         }
         let appointmentText = range.map { String(input[..<$0.lowerBound]) } ?? input
@@ -67,59 +67,89 @@ enum NorwegianDateParser {
     }
     struct Parsed { let title: String; let date: Date }
     static func parse(_ input: String, now: Date = Date(), calendar: Calendar = .current) -> Parsed? {
-        let text = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let words = ["en":1,"ett":1,"et":1,"to":2,"tre":3,"fire":4,"fem":5,"seks":6,"sju":7,"syv":7,"åtte":8,"atte":8,"ni":9,"ti":10,"elleve":11,"tolv":12,"tretten":13,"fjorten":14,"femten":15,"seksten":16,"sytten":17,"atten":18,"nitten":19,"tjue":20,"tjueen":21,"tjueto":22,"tjuetre":23,"tretti":30,"førti":40,"femti":50]
+        var text = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        // Accept common mixed-language spellings produced by dictation.
+        let aliases = [
+            ("morgen früh", "i morgen tidlig"), ("morgen mittag", "i morgen middag"),
+            ("morgen abend", "i morgen kveld"), ("heute morgen", "i dag morges"),
+            ("heute mittag", "i dag middag"), ("heute abend", "i dag kveld"),
+            ("halbe stunde", "en halvtime"), ("halben stunde", "en halvtime"),
+            ("halv time", "halvtime"), ("stunden", "timer"), ("stunde", "time"),
+            ("minuten", "minutter")
+        ]
+        for (old, new) in aliases { text = text.replacingOccurrences(of: old, with: new) }
+        let words = ["null":0,"en":1,"ett":1,"et":1,"to":2,"tre":3,"fire":4,"fem":5,"seks":6,"sju":7,"syv":7,"åtte":8,"atte":8,"ni":9,"ti":10,"elleve":11,"tolv":12,"tretten":13,"fjorten":14,"femten":15,"seksten":16,"sytten":17,"atten":18,"nitten":19,"tjue":20,"tjueen":21,"tjueto":22,"tjuetre":23,"tjuefem":25,"tretti":30,"førti":40,"førtifem":45,"femti":50,"seksti":60]
         func number(_ s: String) -> Int? { Int(s) ?? words[s] }
-        func match(_ pattern: String) -> (NSTextCheckingResult, [String])? {
-            guard let regex = try? NSRegularExpression(pattern: pattern), let m = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
-            return (m, (0..<m.numberOfRanges).map { Range(m.range(at: $0), in: text).map { String(text[$0]) } ?? "" })
+        func match(_ pattern: String) -> [String]? {
+            guard let regex = try? NSRegularExpression(pattern: pattern),
+                  let m = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
+            return (0..<m.numberOfRanges).map { Range(m.range(at: $0), in: text).map { String(text[$0]) } ?? "" }
         }
         func title(removing fragments: [String]) -> String {
-            var result = text
-            for fragment in fragments where !fragment.isEmpty { result = result.replacingOccurrences(of: fragment, with: "") }
-            result = result.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
-            return result.isEmpty ? "Påminnelse" : result.prefix(1).uppercased() + result.dropFirst()
+            var value = text
+            for fragment in fragments where !fragment.isEmpty { value = value.replacingOccurrences(of: fragment, with: "") }
+            value = value.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+            return value.isEmpty ? "Påminnelse" : value.prefix(1).uppercased() + value.dropFirst()
         }
-        if let (_, groups) = match(#"\bom\s+(\d+|[a-zæøå]+)\s+(minutt(?:er|et)?|minut(?:ter|er|e|es)?|min|time(?:r)?)\b"#), let n = number(groups[1]), n > 0 {
-            return Parsed(title: title(removing: [groups[0]]), date: now.addingTimeInterval(Double(n) * (groups[2].hasPrefix("time") ? 3600 : 60)))
+        if let g = match(#"\bom\s+(?:(?:et|ett|en)\s+)?(kvarter|halvtime|time)\b"#) {
+            let minutes = g[1] == "kvarter" ? 15 : (g[1] == "halvtime" ? 30 : 60)
+            return Parsed(title: title(removing: [g[0]]), date: now.addingTimeInterval(Double(minutes * 60)))
         }
-        if text.contains("i morgen tidlig") || text.contains("i morgen tidlig om morgenen") {
-            guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: now),
-                  let morning = calendar.date(bySettingHour: 8, minute: 0, second: 0, of: tomorrow) else { return nil }
-            // Explicit clock time takes precedence over the default morning time.
-            if !text.contains("klokken") && !text.contains("klokka") && !text.contains("kl.") {
-                return Parsed(title: title(removing: ["i morgen tidlig om morgenen", "i morgen tidlig"]), date: morning)
-            }
+        if let g = match(#"\bom\s+(\d+|[a-zæøå]+)\s+(minutt(?:er|et)?|minut(?:ter|er|e|es)?|min|time(?:r)?|dag(?:er)?)\b"#),
+           let amount = number(g[1]), (1...10080).contains(amount) {
+            let date: Date
+            if g[2].hasPrefix("dag") {
+                guard let next = calendar.date(byAdding: .day, value: amount, to: now) else { return nil }
+                date = next
+            } else { date = now.addingTimeInterval(Double(amount) * (g[2].hasPrefix("time") ? 3600 : 60)) }
+            return Parsed(title: title(removing: [g[0]]), date: date)
         }
-        var hour: Int; var minute = 0; let timeFragment: String
-        if let (_, g) = match(#"\b(?:klokken|klocken|klokka|kl\.?)\s*(\d{1,2}|[a-zæøå]+)(?:[:.]([0-5]\d))?\b"#), let h = number(g[1]) {
+        // Without a unit, "om 5" / "om ti" means minutes; do not consume an unknown unit.
+        if let g = match(#"\bom\s+(\d+|en|ett|et|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|femten|tjue|tretti)\s*[.!?,]?\s*$"#),
+           let amount = number(g[1]), (1...10080).contains(amount) {
+            return Parsed(title: title(removing: [g[0]]), date: now.addingTimeInterval(Double(amount * 60)))
+        }
+        var hour: Int?; var minute = 0; var timeFragment = ""
+        if let g = match(#"\b(?:klokken|klocken|klokka|kl\.?)\s*(\d{1,2}|[a-zæøå]+)(?:[:.]([0-9]{2}))?\b"#), let h = number(g[1]) {
             hour = h; minute = Int(g[2]) ?? 0; timeFragment = g[0]
-        } else if let (_, g) = match(#"\bhalv\s+(\d{1,2}|[a-zæøå]+)\b"#), let h = number(g[1]), (1...24).contains(h) {
+        } else if let g = match(#"\bhalv\s+(\d{1,2}|[a-zæøå]+)\b"#), let h = number(g[1]), (1...24).contains(h) {
             hour = (h + 23) % 24; minute = 30; timeFragment = g[0]
-        } else if let (_, g) = match(#"\b([0-1]?\d|2[0-3])\s+([0-5]\d)\b"#) {
-            hour = Int(g[1])!; minute = Int(g[2])!; timeFragment = g[0]
-        } else if let (_, g) = match(#"\b(en|ett|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|elleve|tolv|tretten|fjorten|femten|seksten|sytten|atten|nitten|tjue|tjueen|tjueto|tjuetre)\s+(en|ett|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|femten|tjue|tretti|førti|femti)\b"#),
-                  let h = number(g[1]), let m = number(g[2]), (0...23).contains(h), (0...59).contains(m) {
+        } else if let g = match(#"\b(\d{1,2})[:.](\d{2})\b"#) {
+            hour = Int(g[1]); minute = Int(g[2])!; timeFragment = g[0]
+        } else if let g = match(#"\b(\d{2})(\d{2})\b"#) {
+            hour = Int(g[1]); minute = Int(g[2])!; timeFragment = g[0]
+        } else if let g = match(#"\b(\d{1,2})\s+(\d{2})\b"#) {
+            hour = Int(g[1]); minute = Int(g[2])!; timeFragment = g[0]
+        } else if let g = match(#"\b(en|ett|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|elleve|tolv|tretten|fjorten|femten|seksten|sytten|atten|nitten|tjue|tjueen|tjueto|tjuetre)\s+(null|en|ett|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|femten|tjue|tjuefem|tretti|førti|førtifem|femti)\b"#),
+                  let h = number(g[1]), let m = number(g[2]) {
             hour = h; minute = m; timeFragment = g[0]
-        } else if let (_, g) = match(#"\b([0-1]?\d|2[0-3])[:.]([0-5]\d)\b"#) {
-            hour = Int(g[1])!; minute = Int(g[2])!; timeFragment = g[0]
-        } else if let (_, g) = match(#"\b([01]\d|2[0-3])([0-5]\d)\b"#) {
-            hour = Int(g[1])!; minute = Int(g[2])!; timeFragment = g[0]
-        } else { return nil }
-        guard (0...23).contains(hour) else { return nil }
-        let dayFragment: String
-        let offset: Int
+        }
+        var dayFragment = ""; var offset = 0
         if text.contains("i morgen") { dayFragment = "i morgen"; offset = 1 }
         else if text.contains("overmorgen") { dayFragment = "overmorgen"; offset = 2 }
-        else if text.contains("i dag") { dayFragment = "i dag"; offset = 0 }
-        else { dayFragment = ""; offset = 0 }
-        guard let day = calendar.date(byAdding: .day, value: offset, to: now),
-              var date = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) else { return nil }
+        else if text.contains("i dag") { dayFragment = "i dag" }
+        var period = ""
+        if let g = match(#"\b(tidlig om morgenen|tidlig|morges|morgenen|morgen|formiddag|middag|midten av dagen|ettermiddag|kveld|kvelden|abend|mittag)\b"#) {
+            // "morgen" in "i morgen" specifies a day, not a morning period.
+            if g[1] != "morgen" || dayFragment != "i morgen" { period = g[0] }
+            else if let g2 = match(#"\b(tidlig|morges|morgenen|formiddag|middag|ettermiddag|kveld|kvelden)\b"#) { period = g2[0] }
+        }
+        if hour == nil {
+            if ["tidlig om morgenen", "tidlig", "morges", "morgenen", "morgen", "formiddag"].contains(period) { hour = 8 }
+            else if ["middag", "midten av dagen", "middag"].contains(period) { hour = 12 }
+            else if period == "ettermiddag" { hour = 15 }
+            else if ["kveld", "kvelden", "abend"].contains(period) { hour = 18 }
+            else { return nil }
+        }
+        guard let h = hour, (0...23).contains(h), (0...59).contains(minute),
+              let day = calendar.date(byAdding: .day, value: offset, to: now),
+              var date = calendar.date(bySettingHour: h, minute: minute, second: 0, of: day) else { return nil }
         if dayFragment.isEmpty && date <= now {
             guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: day),
-                  let next = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: tomorrow) else { return nil }
+                  let next = calendar.date(bySettingHour: h, minute: minute, second: 0, of: tomorrow) else { return nil }
             date = next
         }
-        return Parsed(title: title(removing: [timeFragment, dayFragment]), date: date)
+        return Parsed(title: title(removing: [timeFragment, dayFragment, period]), date: date)
     }
 }

@@ -71,3 +71,28 @@ checkAlert("17:20", 7, 17, 20)
 checkAlert("i morgen 1720", 8, 17, 20)
 checkAlert("minn meg 17.20", 7, 17, 20)
 print("One-minute and speech transcription clock checks passed")
+
+checkAlert("minn meg om 5", 7, 12, 5)
+checkAlert("minn meg om 10", 7, 12, 10)
+checkAlert("minn meg om et kvarter", 7, 12, 15)
+checkAlert("minn meg om en halvtime", 7, 12, 30)
+checkAlert("minn meg om halv time", 7, 12, 30)
+checkAlert("minn meg om halbe stunde", 7, 12, 30)
+checkAlert("minn meg om en time", 7, 13)
+checkAlert("minn meg i morgen tidlig", 8, 8)
+checkAlert("minn meg i morgen tidlig 1430", 8, 14, 30)
+checkAlert("minn meg i morgen middag", 8, 12)
+checkAlert("minn meg i morgen kveld", 8, 18)
+checkAlert("minn meg i morgen kveld 1930", 8, 19, 30)
+checkAlert("minn meg i dag kveld", 7, 18)
+checkAlert("minn meg i dag kveld klokken tjue", 7, 20)
+checkAlert("minn meg morgen früh", 8, 8)
+checkAlert("minn meg heute abend", 7, 18)
+precondition(NorwegianDateParser.parseSpoken("minn meg i dag morges", now: now, calendar: calendar) == nil)
+let morningNow = calendar.date(from: DateComponents(year: 2026, month: 10, day: 7, hour: 7))!
+for (phrase, expectedHour) in [("minn meg i dag morges", 8), ("minn meg i dag middag", 12), ("minn meg i dag kveld", 18)] {
+    let parsed = NorwegianDateParser.parseSpoken(phrase, now: morningNow, calendar: calendar)!
+    precondition(calendar.component(.day, from: parsed.alert) == 7 && calendar.component(.hour, from: parsed.alert) == expectedHour)
+}
+precondition(NorwegianDateParser.parseSpoken("minn meg om fem bananer", now: now, calendar: calendar) == nil)
+print("Relative intervals and day-period checks passed")
