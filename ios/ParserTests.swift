@@ -112,3 +112,21 @@ precondition(calendar.component(.minute, from: futureDoctor.alert) == 42)
 checkAlert("minn meg klokken 17 20", 7, 17, 20)
 checkAlert("minn meg klokken sytten tjue", 7, 17, 20)
 print("Current-minute alert and compact Norwegian clock checks passed")
+
+checkAlert("minn meg imorgen 8", 8, 8)
+checkAlert("minn meg imorgen klokken åtte", 8, 8)
+checkAlert("minn meg imorgen 1430", 8, 14, 30)
+checkAlert("minn meg imorgen 00:00", 8, 0)
+checkAlert("minn meg imorgen 2359", 8, 23, 59)
+for hour in 0...23 {
+    for minute in 0...59 {
+        for time in [String(format: "%02d:%02d", hour, minute), String(format: "%02d%02d", hour, minute)] {
+            let parsed = NorwegianDateParser.parseSpoken("minn meg imorgen " + time, now: now, calendar: calendar)!
+            let parts = calendar.dateComponents([.day, .hour, .minute], from: parsed.alert)
+            precondition(parts.day == 8 && parts.hour == hour && parts.minute == minute, time)
+        }
+    }
+}
+precondition(NorwegianDateParser.parseSpoken("minn meg imorgen 2400", now: now, calendar: calendar) == nil)
+precondition(NorwegianDateParser.parseSpoken("minn meg imorgen 2360", now: now, calendar: calendar) == nil)
+print("All 1,440 next-day clock times passed in colon and compact formats")

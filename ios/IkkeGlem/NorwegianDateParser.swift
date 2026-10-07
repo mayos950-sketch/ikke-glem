@@ -138,6 +138,9 @@ enum NorwegianDateParser {
                   let h = number(g[1]), let m = number(g[2]) {
             hour = h; minute = m; timeFragment = g[0]
         }
+        if hour == nil, let g = match(#"\b(\d{1,2}|[a-zæøå]+)\s*[.!?]?\s*$"#), let h = number(g[1]) {
+            hour = h; timeFragment = g[0]
+        }
         var dayFragment = ""; var offset = 0
         if text.contains("i morgen") { dayFragment = "i morgen"; offset = 1 }
         else if text.contains("overmorgen") { dayFragment = "overmorgen"; offset = 2 }
