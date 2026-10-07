@@ -17,7 +17,7 @@ enum NorwegianDateParser {
         let usedDefault: Bool
     }
     static func parseSpoken(_ input: String, now: Date = Date(), calendar: Calendar = .current) -> SpokenReminder? {
-        let marker = #"\b(?:minn meg(?: på det)?|minner meg(?: på det)?|varsle meg|påminn meg(?: på det)?)\s+"#
+        let marker = #"\b(?:minn(?:e)? meg(?: på det)?|minner meg(?: på det)?|varsle meg|påminn meg(?: på det)?)\s+"#
         let regex = try? NSRegularExpression(pattern: marker, options: .caseInsensitive)
         let match = regex?.firstMatch(in: input, range: NSRange(input.startIndex..., in: input))
         let range = match.flatMap { Range($0.range, in: input) }
@@ -93,6 +93,10 @@ enum NorwegianDateParser {
             hour = h; minute = Int(g[2]) ?? 0; timeFragment = g[0]
         } else if let (_, g) = match(#"\bhalv\s+(\d{1,2}|[a-zæøå]+)\b"#), let h = number(g[1]), (1...24).contains(h) {
             hour = (h + 23) % 24; minute = 30; timeFragment = g[0]
+        } else if let (_, g) = match(#"\b([0-1]?\d|2[0-3])[:.]([0-5]\d)\b"#) {
+            hour = Int(g[1])!; minute = Int(g[2])!; timeFragment = g[0]
+        } else if let (_, g) = match(#"\b([01]\d|2[0-3])([0-5]\d)\b"#) {
+            hour = Int(g[1])!; minute = Int(g[2])!; timeFragment = g[0]
         } else { return nil }
         guard (0...23).contains(hour) else { return nil }
         let dayFragment: String

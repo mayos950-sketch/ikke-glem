@@ -69,6 +69,8 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
     @Published var busy = false
     @Published var transcript = ""
     @Published var status = "Si: Legen klokken åtte i morgen, minn meg på det 30 minutter før."
+    private let sound = SpeechNotificationSound()
+    private var spokenSoundReady = false
     private let engine = AVAudioEngine()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var recognition: SFSpeechRecognitionTask?
@@ -105,6 +107,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
                     status = "Tillat varsler i Innstillinger → Ikke glem, så kan jeg minne deg på avtalen."
                     return
                 }
+                spokenSoundReady = await sound.prepare()
                 try begin()
             } catch { stop(); status = "Kunne ikke starte: \(error.localizedDescription)" }
         }
@@ -184,7 +187,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
             let content = UNMutableNotificationContent()
             content.title = "ikke glem by MP"
             content.body = "\(parsed.title) klokken \(parsed.date.formatted(date: .omitted, time: .shortened))"
-            content.sound = .default
+            content.sound = spokenSoundReady ? UNNotificationSound(named: UNNotificationSoundName("ikke-glem.caf")) : .default
             var components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: alert)
             components.timeZone = .current
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
@@ -194,6 +197,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
                 persist()
                 if let address = spokenReminder.address { resolveAddress(address, id: reminder.id) }
                 status = "Lagret ✓ Varsel \(alert.formatted(date: .abbreviated, time: .shortened))."
+                if !spokenSoundReady { status += " Norsk talelyd er ikke tilgjengelig; bruker vanlig varseltone." }
                 if spokenReminder.usedDefault { status += " Uten oppgitt varseltid brukes én time før, eller straks hvis den tiden er passert." }
             } catch { status = "Kunne ikke lagre varselet: \(error.localizedDescription)" }
         }
@@ -249,4 +253,77 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
     }
     private func persist() { if let data = try? JSONEncoder().encode(reminders) { UserDefaults.standard.set(data, forKey: storage) } }
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions { [.banner, .sound, .list] }
+}
+
+
+@MainActor
+private final class SpeechNotificationSound {
+    private let synthesizer = AVSpeechSynthesizer()
+    private var writer: AVAudioFile?
+    private var continuation: CheckedContinuation<Bool, Never>?
+    private var timeout: Task<Void, Never>?
+    private var url: URL?
+
+    func prepare() async -> Bool {
+        guard let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first else { return false }
+        let directory = library.appendingPathComponent("Sounds", isDirectory: true)
+        let destination = directory.appendingPathComponent("ikke-glem.caf")
+        url = destination
+        if validSound(destination) { return true }
+        guard let voice = AVSpeechSynthesisVoice(language: "nb-NO") else { return false }
+        do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) } catch { return false }
+        let utterance = AVSpeechUtterance(string: "Ikke glem!")
+        utterance.voice = voice
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.9
+        synthesizer.usesApplicationAudioSession = false
+        return await withCheckedContinuation { completion in
+            continuation = completion
+            timeout = Task { [weak self] in
+                do { try await Task.sleep(nanoseconds: 8_000_000_000) } catch { return }
+                self?.finish(false)
+            }
+            synthesizer.write(utterance) { [weak self] buffer in
+                DispatchQueue.main.async {
+                    guard let self, self.continuation != nil, let pcm = buffer as? AVAudioPCMBuffer else { return }
+                    if pcm.frameLength == 0 {
+                        self.writer = nil
+                        self.finish(self.validSound(destination))
+                        return
+                    }
+                    do {
+                        if self.writer == nil {
+                            let settings: [String: Any] = [
+                                AVFormatIDKey: kAudioFormatLinearPCM,
+                                AVSampleRateKey: pcm.format.sampleRate,
+                                AVNumberOfChannelsKey: pcm.format.channelCount,
+                                AVLinearPCMBitDepthKey: 16,
+                                AVLinearPCMIsFloatKey: false,
+                                AVLinearPCMIsBigEndianKey: false
+                            ]
+                            self.writer = try AVAudioFile(forWriting: destination, settings: settings, commonFormat: pcm.format.commonFormat, interleaved: pcm.format.isInterleaved)
+                            try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: destination.path)
+                        }
+                        try self.writer?.write(from: pcm)
+                    } catch { self.finish(false) }
+                }
+            }
+        }
+    }
+
+    private func validSound(_ url: URL) -> Bool {
+        guard let file = try? AVAudioFile(forReading: url), file.length > 0 else { return false }
+        let duration = Double(file.length) / file.processingFormat.sampleRate
+        return duration > 0 && duration < 30
+    }
+    private func finish(_ success: Bool) {
+        guard let completion = continuation else { return }
+        continuation = nil
+        timeout?.cancel(); timeout = nil
+        writer = nil
+        if !success {
+            synthesizer.stopSpeaking(at: .immediate)
+            if let url { try? FileManager.default.removeItem(at: url) }
+        }
+        completion.resume(returning: success)
+    }
 }
