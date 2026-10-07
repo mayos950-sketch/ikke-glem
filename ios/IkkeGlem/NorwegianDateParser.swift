@@ -27,6 +27,9 @@ enum NorwegianDateParser {
             guard let parsed = parse(direct.text, now: now, calendar: calendar), parsed.date > now else { return nil }
             return SpokenReminder(appointment: parsed, alert: parsed.date, address: direct.address, usedDefault: false)
         }
+        if range == nil, let bare = parse(input, now: now, calendar: calendar), bare.title == "Påminnelse", bare.date > now {
+            return SpokenReminder(appointment: bare, alert: bare.date, address: nil, usedDefault: false)
+        }
         let appointmentText = range.map { String(input[..<$0.lowerBound]) } ?? input
         let alarmText = range.map { String(input[$0.upperBound...]) }
         let main = splitAddress(appointmentText)
@@ -41,7 +44,7 @@ enum NorwegianDateParser {
             requested = appointment.date
         } else if alarm == "en halvtime før" || alarm == "halvtime før" {
             requested = appointment.date.addingTimeInterval(-1800)
-        } else if let expression = try? NSRegularExpression(pattern: #"^(\d+|[a-zæøå]+)\s+(minutt(?:er)?|time(?:r)?|dag(?:er)?)\s+før$"#),
+        } else if let expression = try? NSRegularExpression(pattern: #"^(\d+|[a-zæøå]+)\s+(minutt(?:er|et)?|minut(?:ter|er|e|es)?|min|time(?:r)?|dag(?:er)?)\s+før$"#),
                   let result = expression.firstMatch(in: alarm, range: NSRange(alarm.startIndex..., in: alarm)),
                   let valueRange = Range(result.range(at: 1), in: alarm),
                   let unitRange = Range(result.range(at: 2), in: alarm) {
@@ -65,7 +68,7 @@ enum NorwegianDateParser {
     struct Parsed { let title: String; let date: Date }
     static func parse(_ input: String, now: Date = Date(), calendar: Calendar = .current) -> Parsed? {
         let text = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let words = ["en":1,"ett":1,"to":2,"tre":3,"fire":4,"fem":5,"seks":6,"sju":7,"syv":7,"åtte":8,"atte":8,"ni":9,"ti":10,"elleve":11,"tolv":12,"tretten":13,"fjorten":14,"femten":15,"seksten":16,"sytten":17,"atten":18,"nitten":19,"tjue":20,"tjueen":21,"tjueto":22,"tjuetre":23]
+        let words = ["en":1,"ett":1,"et":1,"to":2,"tre":3,"fire":4,"fem":5,"seks":6,"sju":7,"syv":7,"åtte":8,"atte":8,"ni":9,"ti":10,"elleve":11,"tolv":12,"tretten":13,"fjorten":14,"femten":15,"seksten":16,"sytten":17,"atten":18,"nitten":19,"tjue":20,"tjueen":21,"tjueto":22,"tjuetre":23,"tretti":30,"førti":40,"femti":50]
         func number(_ s: String) -> Int? { Int(s) ?? words[s] }
         func match(_ pattern: String) -> (NSTextCheckingResult, [String])? {
             guard let regex = try? NSRegularExpression(pattern: pattern), let m = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
@@ -77,7 +80,7 @@ enum NorwegianDateParser {
             result = result.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
             return result.isEmpty ? "Påminnelse" : result.prefix(1).uppercased() + result.dropFirst()
         }
-        if let (_, groups) = match(#"\bom\s+(\d+|[a-zæøå]+)\s+(minutt(?:er)?|time(?:r)?)\b"#), let n = number(groups[1]), n > 0 {
+        if let (_, groups) = match(#"\bom\s+(\d+|[a-zæøå]+)\s+(minutt(?:er|et)?|minut(?:ter|er|e|es)?|min|time(?:r)?)\b"#), let n = number(groups[1]), n > 0 {
             return Parsed(title: title(removing: [groups[0]]), date: now.addingTimeInterval(Double(n) * (groups[2].hasPrefix("time") ? 3600 : 60)))
         }
         if text.contains("i morgen tidlig") || text.contains("i morgen tidlig om morgenen") {
@@ -93,6 +96,11 @@ enum NorwegianDateParser {
             hour = h; minute = Int(g[2]) ?? 0; timeFragment = g[0]
         } else if let (_, g) = match(#"\bhalv\s+(\d{1,2}|[a-zæøå]+)\b"#), let h = number(g[1]), (1...24).contains(h) {
             hour = (h + 23) % 24; minute = 30; timeFragment = g[0]
+        } else if let (_, g) = match(#"\b([0-1]?\d|2[0-3])\s+([0-5]\d)\b"#) {
+            hour = Int(g[1])!; minute = Int(g[2])!; timeFragment = g[0]
+        } else if let (_, g) = match(#"\b(en|ett|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|elleve|tolv|tretten|fjorten|femten|seksten|sytten|atten|nitten|tjue|tjueen|tjueto|tjuetre)\s+(en|ett|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|femten|tjue|tretti|førti|femti)\b"#),
+                  let h = number(g[1]), let m = number(g[2]), (0...23).contains(h), (0...59).contains(m) {
+            hour = h; minute = m; timeFragment = g[0]
         } else if let (_, g) = match(#"\b([0-1]?\d|2[0-3])[:.]([0-5]\d)\b"#) {
             hour = Int(g[1])!; minute = Int(g[2])!; timeFragment = g[0]
         } else if let (_, g) = match(#"\b([01]\d|2[0-3])([0-5]\d)\b"#) {
