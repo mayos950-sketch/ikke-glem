@@ -10,6 +10,52 @@ enum NorwegianDateParser {
         guard !address.isEmpty else { return (input, nil) }
         return (String(input[..<range.lowerBound]), address)
     }
+    struct SpokenReminder {
+        let appointment: Parsed
+        let alert: Date
+        let address: String?
+        let usedDefault: Bool
+    }
+    static func parseSpoken(_ input: String, now: Date = Date(), calendar: Calendar = .current) -> SpokenReminder? {
+        let marker = #"\b(?:minn meg(?: på det)?|minner meg(?: på det)?|varsle meg|påminn meg(?: på det)?)\s+"#
+        let regex = try? NSRegularExpression(pattern: marker, options: .caseInsensitive)
+        let match = regex?.firstMatch(in: input, range: NSRange(input.startIndex..., in: input))
+        let range = match.flatMap { Range($0.range, in: input) }
+        let appointmentText = range.map { String(input[..<$0.lowerBound]) } ?? input
+        let alarmText = range.map { String(input[$0.upperBound...]) }
+        let main = splitAddress(appointmentText)
+        let alarmPart = alarmText.map { splitAddress($0) }
+        guard let appointment = parse(main.text, now: now, calendar: calendar), appointment.date > now else { return nil }
+        let address = main.address ?? alarmPart?.address
+        guard let alarm = alarmPart?.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters)) else {
+            return SpokenReminder(appointment: appointment, alert: max(appointment.date.addingTimeInterval(-3600), now.addingTimeInterval(5)), address: address, usedDefault: true)
+        }
+        let requested: Date
+        if alarm == "ved avtalen" || alarm == "på slaget" || alarm == "da" {
+            requested = appointment.date
+        } else if alarm == "en halvtime før" || alarm == "halvtime før" {
+            requested = appointment.date.addingTimeInterval(-1800)
+        } else if let expression = try? NSRegularExpression(pattern: #"^(\d+|[a-zæøå]+)\s+(minutt(?:er)?|time(?:r)?|dag(?:er)?)\s+før$"#),
+                  let result = expression.firstMatch(in: alarm, range: NSRange(alarm.startIndex..., in: alarm)),
+                  let valueRange = Range(result.range(at: 1), in: alarm),
+                  let unitRange = Range(result.range(at: 2), in: alarm) {
+            let word = String(alarm[valueRange])
+            let numbers = ["en":1, "ett":1, "to":2, "tre":3, "fire":4, "fem":5, "seks":6, "sju":7, "syv":7, "åtte":8, "ni":9, "ti":10, "femten":15, "tjue":20, "tretti":30, "førtifem":45, "seksti":60]
+            guard let amount = Int(word) ?? numbers[word], (0...10080).contains(amount) else { return nil }
+            let unit = String(alarm[unitRange])
+            if unit.hasPrefix("dag") {
+                guard let date = calendar.date(byAdding: .day, value: -amount, to: appointment.date) else { return nil }
+                requested = date
+            } else {
+                requested = appointment.date.addingTimeInterval(-Double(amount) * (unit.hasPrefix("time") ? 3600 : 60))
+            }
+        } else if alarm.hasPrefix("klokken ") || alarm.hasPrefix("klokka ") || alarm.hasPrefix("kl. ") {
+            guard let parsed = parse("Varsel " + alarm + " i dag", now: appointment.date, calendar: calendar) else { return nil }
+            requested = parsed.date
+        } else { return nil }
+        guard requested > now && requested <= appointment.date else { return nil }
+        return SpokenReminder(appointment: appointment, alert: requested, address: address, usedDefault: false)
+    }
     struct Parsed { let title: String; let date: Date }
     static func parse(_ input: String, now: Date = Date(), calendar: Calendar = .current) -> Parsed? {
         let text = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
