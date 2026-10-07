@@ -96,3 +96,19 @@ for (phrase, expectedHour) in [("minn meg i dag morges", 8), ("minn meg i dag mi
 }
 precondition(NorwegianDateParser.parseSpoken("minn meg om fem bananer", now: now, calendar: calendar) == nil)
 print("Relative intervals and day-period checks passed")
+
+let at1741 = calendar.date(from: DateComponents(year: 2026, month: 10, day: 7, hour: 17, minute: 41, second: 16))!
+let doctor = NorwegianDateParser.parseSpoken("legen klokken 18 idag minn meg klokken 1741", now: at1741, calendar: calendar)!
+precondition(doctor.appointment.title == "Legen")
+precondition(calendar.component(.hour, from: doctor.appointment.date) == 18)
+precondition(abs(doctor.alert.timeIntervalSince(at1741) - 5) < 0.01)
+let compactDoctor = NorwegianDateParser.parseSpoken("legen klokken18 idag minn meg klokken1741", now: at1741, calendar: calendar)!
+precondition(abs(compactDoctor.alert.timeIntervalSince(at1741) - 5) < 0.01)
+precondition(NorwegianDateParser.parseSpoken("legen klokken 18 idag minn meg klokken 1740", now: at1741, calendar: calendar) == nil)
+let directCurrent = NorwegianDateParser.parseSpoken("minn meg 1741", now: at1741, calendar: calendar)!
+precondition(abs(directCurrent.alert.timeIntervalSince(at1741) - 5) < 0.01)
+let futureDoctor = NorwegianDateParser.parseSpoken("legen klokken 18 idag minn meg klokken 1742", now: at1741, calendar: calendar)!
+precondition(calendar.component(.minute, from: futureDoctor.alert) == 42)
+checkAlert("minn meg klokken 17 20", 7, 17, 20)
+checkAlert("minn meg klokken sytten tjue", 7, 17, 20)
+print("Current-minute alert and compact Norwegian clock checks passed")

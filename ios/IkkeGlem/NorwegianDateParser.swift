@@ -58,16 +58,23 @@ enum NorwegianDateParser {
             } else {
                 requested = appointment.date.addingTimeInterval(-Double(amount) * (unit.hasPrefix("time") ? 3600 : 60))
             }
-        } else if alarm.hasPrefix("klokken ") || alarm.hasPrefix("klokka ") || alarm.hasPrefix("kl. ") {
+        } else if alarm.hasPrefix("klokken") || alarm.hasPrefix("klocken") || alarm.hasPrefix("klokka") || alarm.hasPrefix("kl.") || alarm.range(of: #"^\d{4}$|^\d{1,2}[:.]\d{2}$"#, options: .regularExpression) != nil {
             guard let parsed = parse("Varsel " + alarm + " i dag", now: appointment.date, calendar: calendar) else { return nil }
             requested = parsed.date
         } else { return nil }
-        guard requested > now && requested <= appointment.date else { return nil }
-        return SpokenReminder(appointment: appointment, alert: requested, address: address, usedDefault: false)
+        guard requested <= appointment.date else { return nil }
+        let alert: Date
+        if requested <= now {
+            guard calendar.isDate(requested, equalTo: now, toGranularity: .minute) else { return nil }
+            alert = min(now.addingTimeInterval(5), appointment.date)
+        } else { alert = requested }
+        return SpokenReminder(appointment: appointment, alert: alert, address: address, usedDefault: false)
     }
     struct Parsed { let title: String; let date: Date }
     static func parse(_ input: String, now: Date = Date(), calendar: Calendar = .current) -> Parsed? {
         var text = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        text = text.replacingOccurrences(of: #"\bidag\b"#, with: "i dag", options: .regularExpression)
+            .replacingOccurrences(of: #"\bimorgen\b"#, with: "i morgen", options: .regularExpression)
         // Accept common mixed-language spellings produced by dictation.
         let aliases = [
             ("morgen früh", "i morgen tidlig"), ("morgen mittag", "i morgen middag"),
@@ -111,7 +118,13 @@ enum NorwegianDateParser {
             return Parsed(title: title(removing: [g[0]]), date: now.addingTimeInterval(Double(amount * 60)))
         }
         var hour: Int?; var minute = 0; var timeFragment = ""
-        if let g = match(#"\b(?:klokken|klocken|klokka|kl\.?)\s*(\d{1,2}|[a-zæøå]+)(?:[:.]([0-9]{2}))?\b"#), let h = number(g[1]) {
+        if let g = match(#"\b(?:(?:klokken|klocken|klokka|kl\.?)\s*)?(\d{1,2})[:.\s](\d{2})\b"#) {
+            hour = Int(g[1]); minute = Int(g[2])!; timeFragment = g[0]
+        } else if let g = match(#"\b(?:(?:klokken|klocken|klokka|kl\.?)\s*)?(\d{2})(\d{2})\b"#) {
+            hour = Int(g[1]); minute = Int(g[2])!; timeFragment = g[0]
+        } else if let g = match(#"\b(?:(?:klokken|klocken|klokka|kl\.?)\s*)?(en|ett|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|elleve|tolv|tretten|fjorten|femten|seksten|sytten|atten|nitten|tjue|tjueen|tjueto|tjuetre)\s+(null|en|ett|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|femten|tjue|tjuefem|tretti|førti|førtifem|femti)\b"#), let h = number(g[1]), let m = number(g[2]) {
+            hour = h; minute = m; timeFragment = g[0]
+        } else if let g = match(#"\b(?:klokken|klocken|klokka|kl\.?)\s*(\d{1,2}|[a-zæøå]+)(?:[:.]([0-9]{2}))?\b"#), let h = number(g[1]) {
             hour = h; minute = Int(g[2]) ?? 0; timeFragment = g[0]
         } else if let g = match(#"\bhalv\s+(\d{1,2}|[a-zæøå]+)\b"#), let h = number(g[1]), (1...24).contains(h) {
             hour = (h + 23) % 24; minute = 30; timeFragment = g[0]
@@ -145,7 +158,9 @@ enum NorwegianDateParser {
         guard let h = hour, (0...23).contains(h), (0...59).contains(minute),
               let day = calendar.date(byAdding: .day, value: offset, to: now),
               var date = calendar.date(bySettingHour: h, minute: minute, second: 0, of: day) else { return nil }
-        if dayFragment.isEmpty && date <= now {
+        if date <= now && calendar.isDate(date, equalTo: now, toGranularity: .minute) {
+            date = now.addingTimeInterval(5)
+        } else if dayFragment.isEmpty && date <= now {
             guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: day),
                   let next = calendar.date(bySettingHour: h, minute: minute, second: 0, of: tomorrow) else { return nil }
             date = next
