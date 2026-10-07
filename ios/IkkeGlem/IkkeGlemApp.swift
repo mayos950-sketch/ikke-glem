@@ -29,10 +29,15 @@ struct ContentView: View {
     @State private var showCalendars = false
     var body: some View {
         ZStack {
-            Color(red: 0.04, green: 0.07, blue: 0.14).ignoresSafeArea()
+            GeometryReader { geometry in
+                Image("ForgetfulBackground").resizable().scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+            }.ignoresSafeArea()
+            Color.black.opacity(0.16).ignoresSafeArea()
             VStack(spacing: 22) {
                 Text("ikke glem by MP").font(.largeTitle.bold())
-                Text("Ett trykk. Si det. Ferdig. · v1.5").foregroundStyle(.secondary)
+                Text("Ett trykk. Si det. Ferdig. · v1.6").foregroundStyle(.secondary)
                 Button { showCalendars = true } label: { Label("Kalender", systemImage: "calendar.badge.plus") }.disabled(model.busy || model.listening)
                 Button { model.tap() } label: {
                     ZStack {
@@ -56,7 +61,7 @@ struct ContentView: View {
                                 Text(address).font(.subheadline)
                                 Button { model.openMaps(reminder) } label: { Label("Åpne i Maps", systemImage: "map") }.buttonStyle(.borderless)
                             }
-                        }.listRowBackground(Color.white.opacity(0.06))
+                        }.listRowBackground(Color(red: 0.025, green: 0.065, blue: 0.14).opacity(0.9))
                         .swipeActions { Button("Slett", role: .destructive) { model.remove(reminder) } }
                     }
                 }.scrollContentBackground(.hidden).listStyle(.plain)
