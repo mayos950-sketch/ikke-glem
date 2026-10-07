@@ -43,3 +43,10 @@ precondition(NorwegianDateParser.parseSpoken("Legen klokken åtte i morgen, minn
 precondition(NorwegianDateParser.parseSpoken("Legen klokken åtte i morgen, varsle meg klokken ni", now: now, calendar: calendar) == nil)
 precondition(NorwegianDateParser.parseSpoken("Legen klokken tretten i dag, minn meg to timer før", now: now, calendar: calendar) == nil)
 print("Custom notification time checks passed")
+
+checkAlert("Minn meg om ti minutter", 7, 12, 10)
+checkAlert("Minn meg i morgen tidlig", 8, 8)
+checkAlert("Minn meg ring Petra i morgen tidlig", 8, 8)
+checkAlert("Minn meg ring Petra i morgen tidlig klokken ni", 8, 9)
+precondition(NorwegianDateParser.parseSpoken("Minn meg i morgen tidlig", now: now, calendar: calendar)?.usedDefault == false)
+print("Direct reminder checks passed")

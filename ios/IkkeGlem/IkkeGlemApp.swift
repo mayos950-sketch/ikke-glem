@@ -31,11 +31,14 @@ struct ContentView: View {
                 Text("ikke glem by MP").font(.largeTitle.bold())
                 Text("Ett trykk. Si det. Ferdig.").foregroundStyle(.secondary)
                 Button { model.tap() } label: {
-                    Label(model.listening ? "Lytter …" : "Snakk", systemImage: "mic.fill")
-                        .font(.title.bold()).frame(maxWidth: .infinity).padding(28)
+                    ZStack {
+                        Image("VoiceButton").resizable().scaledToFit().frame(height: 130)
+                        if model.listening { ProgressView().tint(.white).scaleEffect(1.5) }
+                    }.frame(maxWidth: .infinity).padding(14)
                 }
                 .buttonStyle(.borderedProminent).tint(.green)
                 .disabled(model.busy || model.listening)
+                .accessibilityLabel(model.listening ? "Lytter" : "Snakk")
                 Text(model.transcript).font(.title3).accessibilityLabel("Det du sa")
                 Text(model.status).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     .accessibilityAddTraits(.updatesFrequently)

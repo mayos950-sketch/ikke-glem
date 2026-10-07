@@ -19,14 +19,14 @@ textarea{min-height:92px}.btn{width:100%;border:0;border-radius:14px;padding:14p
 </style>
 </head>
 <body>
-<div class="version">v24</div>
+<div class="version">v25</div>
 <div class="wrap">
 <div class="hero"><img class="logo" src="icon-192.png"><h1>ikke glem by MP</h1><div class="tag">Bare si det – så husker vi det for deg.</div></div>
 
 <div class="card">
 <input id="text" type="hidden">
 <input id="when" type="hidden">
-<button class="btn listen" id="speakBtn" onclick="startSpeech()">🎤 Snakk</button>
+<button class="btn listen" id="speakBtn" onclick="startSpeech()" aria-label="Snakk"><img src="voice-button.png" alt="" style="height:130px;width:130px;object-fit:contain"></button>
 <div id="detected" class="detected"></div>
 <div id="status" class="status" role="status" aria-live="polite"></div>
 <div class="small">Si for eksempel «Legen klokken åtte i morgen». Lagres automatisk. Alarm én time før.</div>
@@ -85,7 +85,7 @@ function startSpeech(){
  const rec=new SR(); recognition=rec;rec.lang="nb-NO";rec.continuous=false;rec.interimResults=true;rec.maxAlternatives=1;
  let heard=false, saved=false;
  $("text").value="";$("when").value="";
- function reset(){clearTimeout(speechTimeout);if(recognition===rec)recognition=null;$("speakBtn").textContent="🎤 Snakk"}
+ function reset(){clearTimeout(speechTimeout);if(recognition===rec)recognition=null;$("speakBtn").innerHTML='<img src="voice-button.png" alt="" style="height:130px;width:130px;object-fit:contain">'}
  rec.onstart=()=>{$("speakBtn").textContent="⏹️ Stopp";$("status").textContent="Lytter på norsk …"};
  rec.onresult=e=>{let spoken="";for(let i=0;i<e.results.length;i++)spoken+=e.results[i][0].transcript+" ";if(saved)return;heard=true;$("text").value=spoken.trim();preview();if(Array.from(e.results).every(r=>r.isFinal)){if(parseNatural(spoken)){saved=true;saveReminder(true);rec.stop()}else $("status").textContent="Jeg forstod ikke tiden. Si for eksempel: Legen klokken åtte i morgen."}else $("status").textContent="Lytter på norsk …";};
  rec.onerror=e=>{reset();const messages={"not-allowed":"Tillat mikrofon og talegjenkjenning i Safari. Kontroller også at Siri er aktivert.","service-not-allowed":"Talegjenkjenning er ikke tillatt. Åpne i Safari og kontroller Siri-innstillingene.","language-not-supported":"Norsk talegjenkjenning er ikke tilgjengelig på denne enheten.","no-speech":"Jeg hørte ingen tale. Trykk Snakk og prøv igjen.","network":"Talegjenkjenningen fikk en nettverksfeil. Prøv igjen."};$("status").textContent=messages[e.error]||"Talegjenkjenning feilet: "+e.error};

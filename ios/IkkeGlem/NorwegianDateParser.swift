@@ -21,6 +21,12 @@ enum NorwegianDateParser {
         let regex = try? NSRegularExpression(pattern: marker, options: .caseInsensitive)
         let match = regex?.firstMatch(in: input, range: NSRange(input.startIndex..., in: input))
         let range = match.flatMap { Range($0.range, in: input) }
+        // A command that begins with Minn meg is a direct reminder, not an advance warning.
+        if let range, input[..<range.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let direct = splitAddress(String(input[range.upperBound...]))
+            guard let parsed = parse(direct.text, now: now, calendar: calendar), parsed.date > now else { return nil }
+            return SpokenReminder(appointment: parsed, alert: parsed.date, address: direct.address, usedDefault: false)
+        }
         let appointmentText = range.map { String(input[..<$0.lowerBound]) } ?? input
         let alarmText = range.map { String(input[$0.upperBound...]) }
         let main = splitAddress(appointmentText)
@@ -73,6 +79,14 @@ enum NorwegianDateParser {
         }
         if let (_, groups) = match(#"\bom\s+(\d+|[a-zæøå]+)\s+(minutt(?:er)?|time(?:r)?)\b"#), let n = number(groups[1]), n > 0 {
             return Parsed(title: title(removing: [groups[0]]), date: now.addingTimeInterval(Double(n) * (groups[2].hasPrefix("time") ? 3600 : 60)))
+        }
+        if text.contains("i morgen tidlig") || text.contains("i morgen tidlig om morgenen") {
+            guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: now),
+                  let morning = calendar.date(bySettingHour: 8, minute: 0, second: 0, of: tomorrow) else { return nil }
+            // Explicit clock time takes precedence over the default morning time.
+            if !text.contains("klokken") && !text.contains("klokka") && !text.contains("kl.") {
+                return Parsed(title: title(removing: ["i morgen tidlig om morgenen", "i morgen tidlig"]), date: morning)
+            }
         }
         var hour: Int; var minute = 0; let timeFragment: String
         if let (_, g) = match(#"\b(?:klokken|klocken|klokka|kl\.?)\s*(\d{1,2}|[a-zæøå]+)(?:[:.]([0-5]\d))?\b"#), let h = number(g[1]) {
