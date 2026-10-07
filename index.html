@@ -19,14 +19,14 @@ textarea{min-height:92px}.btn{width:100%;border:0;border-radius:14px;padding:14p
 </style>
 </head>
 <body>
-<div class="version">v21</div>
+<div class="version">v22</div>
 <div class="wrap">
 <div class="hero"><img class="logo" src="icon-192.png"><h1>Ikke glem</h1><div class="tag">Bare si det – så husker vi det for deg.</div></div>
 
 <div class="card">
 <label>Hva skal du huske?</label>
 <textarea id="text" placeholder="Lege klokken 8 i dag"></textarea>
-<button class="btn listen" onclick="keyboardDictation()">🎤 Bruk iPhone-diktat</button>
+<button class="btn listen" id="speakBtn" onclick="startSpeech()">🎤 Snakk norsk</button>
 <div id="detected" class="detected"></div>
 <label>Når?</label>
 <input id="when" type="datetime-local">
@@ -45,7 +45,7 @@ textarea{min-height:92px}.btn{width:100%;border:0;border-radius:14px;padding:14p
 
 <script>
 const KEY="ikke_glem_reminders_v2";
-let reminders=load(), timer=null;
+let reminders=load(), timer=null, recognition=null, speechTimeout=null;
 const $=id=>document.getElementById(id);
 function load(){try{return JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("ikke_glem_reminders_v1")||"[]")}catch(e){return[]}}
 function persist(){localStorage.setItem(KEY,JSON.stringify(reminders))}
@@ -83,6 +83,20 @@ function saveReminder(auto=false){
  const reminder={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),text:title,when,done:false,fired:false};
  reminders.push(reminder);persist();render();schedule();$("text").value="";$("when").value="";$("detected").style.display="none";$("status").textContent="Lagret ✓ Åpne kalenderfilen og bekreft Legg til i Kalender.";
  downloadCalendar(reminder);
+}
+function startSpeech(){
+ if(recognition){recognition.stop();return}
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){$("status").textContent="Åpne appen i Safari. Talegjenkjenning er ikke tilgjengelig i denne nettleseren.";return}
+ const rec=new SR(); recognition=rec;rec.lang="nb-NO";rec.continuous=false;rec.interimResults=true;rec.maxAlternatives=1;
+ let heard=false;
+ function reset(){clearTimeout(speechTimeout);if(recognition===rec)recognition=null;$("speakBtn").textContent="🎤 Snakk norsk"}
+ rec.onstart=()=>{$("speakBtn").textContent="⏹️ Stopp";$("status").textContent="Lytter på norsk …"};
+ rec.onresult=e=>{let spoken="";for(let i=0;i<e.results.length;i++)spoken+=e.results[i][0].transcript+" ";heard=true;$("text").value=spoken.trim();preview();$("status").textContent="Kontroller teksten og tiden, og trykk Legg til."};
+ rec.onerror=e=>{reset();const messages={"not-allowed":"Tillat mikrofon og talegjenkjenning i Safari. Kontroller også at Siri er aktivert.","service-not-allowed":"Talegjenkjenning er ikke tillatt. Åpne i Safari og kontroller Siri-innstillingene.","language-not-supported":"Norsk talegjenkjenning er ikke tilgjengelig på denne enheten.","no-speech":"Jeg hørte ingen tale. Trykk Snakk norsk og prøv igjen.","network":"Talegjenkjenningen fikk en nettverksfeil. Prøv igjen."};$("status").textContent=messages[e.error]||"Talegjenkjenning feilet: "+e.error};
+ rec.onend=()=>{reset();if(!heard&&$("status").textContent==="Lytter på norsk …")$("status").textContent="Ingen tale ble registrert. Trykk Snakk norsk og prøv igjen."};
+ $("status").textContent="Starter norsk talegjenkjenning …";
+ try{rec.start();speechTimeout=setTimeout(()=>{if(recognition===rec){rec.abort();reset();if(!heard)$("status").textContent="Talegjenkjenningen svarte ikke. Åpne i Safari og kontroller at Siri er aktivert."}},20000)}catch(e){reset();$("status").textContent="Kunne ikke starte talegjenkjenning. Prøv i Safari."}
 }
 function keyboardDictation(){$("text").focus();$("status").textContent="Trykk på mikrofonen på iPhone-tastaturet og si hele påminnelsen."}
 function icsEscape(value){return String(value).replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
