@@ -19,32 +19,33 @@ textarea{min-height:92px}.btn{width:100%;border:0;border-radius:14px;padding:14p
 </style>
 </head>
 <body>
-<div class="version">v20</div>
+<div class="version">v21</div>
 <div class="wrap">
 <div class="hero"><img class="logo" src="icon-192.png"><h1>Ikke glem</h1><div class="tag">Bare si det – så husker vi det for deg.</div></div>
 
 <div class="card">
 <label>Hva skal du huske?</label>
 <textarea id="text" placeholder="Lege klokken 8 i dag"></textarea>
-<button class="btn listen" id="speakBtn" onclick="startSpeech()">🎤 Si påminnelsen</button>
+<button class="btn listen" onclick="keyboardDictation()">🎤 Bruk iPhone-diktat</button>
 <div id="detected" class="detected"></div>
 <label>Når?</label>
 <input id="when" type="datetime-local">
 <div class="row">
-<button class="btn" onclick="keyboardDictation()">⌨️ Tastatur-diktat</button>
+<button class="btn" onclick="keyboardDictation()">⌨️ Skriv eller dikter</button>
 <button class="btn gold" onclick="saveReminder()">➕ Legg til</button>
 </div>
 <div id="status" class="status"></div>
+<div class="small">Når du lagrer, lastes en kalenderfil ned. Åpne den og bekreft «Legg til i Kalender» for alarm når appen er lukket.</div>
 <div class="small">Eksempel: «Lege klokken 8 i dag», «Ring Petra i morgen klokken 9», «Kjøp melk om 30 minutter».</div>
 </div>
 
 <div class="card"><h2>Mine påminnelser</h2><div id="list"></div></div>
-<div class="card"><button class="btn" onclick="askNotificationPermission()">🔔 Tillat varsler</button></div>
+
 </div>
 
 <script>
 const KEY="ikke_glem_reminders_v2";
-let reminders=load(), timer=null, recognition=null;
+let reminders=load(), timer=null;
 const $=id=>document.getElementById(id);
 function load(){try{return JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("ikke_glem_reminders_v1")||"[]")}catch(e){return[]}}
 function persist(){localStorage.setItem(KEY,JSON.stringify(reminders))}
@@ -79,25 +80,28 @@ function saveReminder(auto=false){
  const text=$("text").value.trim(); if(!text){$("status").textContent="Si eller skriv en påminnelse.";return}
  const p=parseNatural(text), manual=$("when").value, when=manual?new Date(manual).getTime():(p&&p.when), title=(p&&p.clean)||text;
  if(!when||when<=Date.now()){$("status").textContent='Jeg forstod ikke tidspunktet. Prøv «klokken 8 i dag».';return}
- reminders.push({id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),text:title,when,done:false,fired:false});
- persist();render();schedule();$("text").value="";$("when").value="";$("detected").style.display="none";$("status").textContent=auto?`Lagret automatisk ✓ ${fmt(when)}`:"Lagret ✓";
-}
-function startSpeech(){
- const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!SR){keyboardDictation();return}
- recognition=new SR();recognition.lang="nb-NO";recognition.interimResults=false;recognition.maxAlternatives=1;
- $("speakBtn").textContent="🎙️ Lytter …";$("status").textContent="Snakk nå.";
- recognition.onresult=e=>{const spoken=e.results[0][0].transcript.trim();$("text").value=spoken;preview();if(parseNatural(spoken))saveReminder(true);else $("status").textContent="Jeg hørte deg, men forstod ikke tidspunktet."};
- recognition.onerror=()=>{$("status").textContent="Talegjenkjenning feilet. Bruk tastatur-diktat."};
- recognition.onend=()=>{$("speakBtn").textContent="🎤 Si påminnelsen"};
- recognition.start();
+ const reminder={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),text:title,when,done:false,fired:false};
+ reminders.push(reminder);persist();render();schedule();$("text").value="";$("when").value="";$("detected").style.display="none";$("status").textContent="Lagret ✓ Åpne kalenderfilen og bekreft Legg til i Kalender.";
+ downloadCalendar(reminder);
 }
 function keyboardDictation(){$("text").focus();$("status").textContent="Trykk på mikrofonen på iPhone-tastaturet og si hele påminnelsen."}
-function render(){const b=$("list"),s=[...reminders].sort((a,b)=>a.when-b.when);if(!s.length){b.innerHTML='<div class="empty">Ingen påminnelser ennå.</div>';return}b.innerHTML=s.map(r=>`<div class="item"><div class="item-title">${esc(r.text)}</div><div class="item-time">${fmt(r.when)}</div><div class="item-actions"><button onclick="done('${r.id}')">✅ Ferdig</button><button onclick="del('${r.id}')">🗑️ Slett</button></div></div>`).join("")}
+function icsEscape(value){return String(value).replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
+function icsDate(date){return date.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"")}
+function downloadCalendar(r){
+ const start=new Date(r.when), end=new Date(r.when+15*60000);
+ const lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Ikke glem//NO","CALSCALE:GREGORIAN","METHOD:PUBLISH","BEGIN:VEVENT",
+  "UID:"+r.id+"@ikke-glem","DTSTAMP:"+icsDate(new Date()),"DTSTART:"+icsDate(start),"DTEND:"+icsDate(end),
+  "SUMMARY:"+icsEscape(r.text),"DESCRIPTION:Påminnelse fra Ikke glem","BEGIN:VALARM","TRIGGER:-PT5M","ACTION:DISPLAY","DESCRIPTION:"+icsEscape(r.text),"END:VALARM","END:VEVENT","END:VCALENDAR"];
+ const blob=new Blob([lines.join("\r\n")+"\r\n"],{type:"text/calendar;charset=utf-8"});
+ const url=URL.createObjectURL(blob), a=document.createElement("a");
+ a.href=url;a.download="ikke-glem-"+new Date(r.when).toISOString().slice(0,10)+".ics";document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+function calendarById(id){const r=reminders.find(x=>x.id===id);if(r)downloadCalendar(r)}
+function render(){const b=$("list"),s=[...reminders].sort((a,b)=>a.when-b.when);if(!s.length){b.innerHTML='<div class="empty">Ingen påminnelser ennå.</div>';return}b.innerHTML=s.map(r=>`<div class="item"><div class="item-title">${esc(r.text)}</div><div class="item-time">${fmt(r.when)}</div><div class="item-actions"><button onclick="calendarById('${r.id}')">📅 Kalender</button><button onclick="done('${r.id}')">✅ Ferdig</button><button onclick="del('${r.id}')">🗑️ Slett</button></div></div>`).join("")}
 function done(id){const r=reminders.find(x=>x.id===id);if(r){r.done=true;persist();render()}}
 function del(id){reminders=reminders.filter(x=>x.id!==id);persist();render()}
-async function askNotificationPermission(){if(!("Notification" in window)){$("status").textContent="Varsler støttes ikke her.";return}const p=await Notification.requestPermission();$("status").textContent=p==="granted"?"Varsler er tillatt ✓":"Varsler ble ikke tillatt."}
-function fire(r){r.fired=true;persist();if("Notification"in window&&Notification.permission==="granted")new Notification("Ikke glem",{body:r.text,icon:"icon-192.png"});else alert("Ikke glem!\n\n"+r.text)}
+function fire(r){r.fired=true;persist();if(document.visibilityState==="visible")alert("Ikke glem!\n\n"+r.text)}
 function schedule(){if(timer)clearInterval(timer);timer=setInterval(()=>{const n=Date.now();reminders.forEach(r=>{if(!r.done&&!r.fired&&r.when<=n)fire(r)})},5000)}
 $("text").addEventListener("input",preview);
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
