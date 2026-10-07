@@ -1,6 +1,6 @@
 # Ikke glem – native iPhone-App
 
-Einmal **Snakk** tippen und z. B. „Legen klokken åtte i morgen“ sagen. Nach einer kurzen Sprechpause wird der Termin automatisch gespeichert. Das iPhone plant eine lokale Mitteilung eine Stunde vorher, ohne Kalender-Import und ohne laufende App. Beim ersten Start sind Freigaben für Mikrofon, Spracherkennung und Mitteilungen erforderlich.
+Einmal **Snakk** tippen und z. B. „Legen klokken åtte i morgen“ sagen. Nach einer kurzen Sprechpause wird der Termin automatisch gespeichert. Du kannst die Zeit mitsprechen: „minn meg 30 minutter før“ oder „varsle meg klokken sju“. Das iPhone plant die lokale Mitteilung zum gewünschten Zeitpunkt, ohne Kalender-Import und ohne laufende App. Beim ersten Start sind Freigaben für Mikrofon, Spracherkennung und Mitteilungen erforderlich.
 
 ## Auf dem iMac installieren
 
@@ -18,7 +18,7 @@ Eine persönliche Installation braucht keine Veröffentlichung im App Store. Ein
 - Sprache: Norwegisch Bokmål (`nb-NO`). Je nach Gerät kann Internet nötig sein.
 - Beispiele: „Legen klokken 8“, „Legen klokken åtte i morgen“, „Ring Petra halv ni i morgen“, „Kjøp melk om 30 minutter“.
 - Ohne Datum wird das nächste Vorkommen der Uhrzeit verwendet; „i dag“ mit vergangener Uhrzeit wird abgelehnt.
-- Der Alarm liegt eine Stunde vor dem Termin. Ist diese Zeit bereits vorbei, wird eine Mitteilung in fünf Sekunden eingeplant und dies angezeigt.
+- Die gewünschte Varseltid wird mitgesprochen: „minn meg på det 30 minutter før“, „minn meg to timer før“, „varsle meg klokken sju“ oder „minn meg ved avtalen“. Unklare oder vergangene ausdrücklich genannte Zeiten werden abgelehnt. Ohne Angabe bleibt eine Stunde vorher der Standard; ist diese Zeit vorbei, wird in fünf Sekunden erinnert.
 - Ende der Aufnahme: finales Sprachergebnis oder 1,8 Sekunden ohne neue Transkription. Bei längeren Sprechpausen kann ein Satz zu früh abgeschlossen werden. Die erkannte Aussage und gespeicherte Zeit werden angezeigt.
 - Zum Löschen einen Listeneintrag nach links wischen. Sein geplanter Alarm wird entfernt.
 - iOS-Fokus, lautloser Modus und die Mitteilungseinstellungen bestimmen, ob eine Mitteilung hörbar ist; dies ist kein kritischer Systemwecker.
