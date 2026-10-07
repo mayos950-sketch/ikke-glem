@@ -19,24 +19,18 @@ textarea{min-height:92px}.btn{width:100%;border:0;border-radius:14px;padding:14p
 </style>
 </head>
 <body>
-<div class="version">v23</div>
+<div class="version">v24</div>
 <div class="wrap">
 <div class="hero"><img class="logo" src="icon-192.png"><h1>Ikke glem</h1><div class="tag">Bare si det – så husker vi det for deg.</div></div>
 
 <div class="card">
-<label>Hva skal du huske?</label>
-<textarea id="text" placeholder="Lege klokken 8 i dag"></textarea>
-<button class="btn listen" id="speakBtn" onclick="startSpeech()">🎤 Snakk norsk</button>
+<input id="text" type="hidden">
+<input id="when" type="hidden">
+<button class="btn listen" id="speakBtn" onclick="startSpeech()">🎤 Snakk</button>
 <div id="detected" class="detected"></div>
-<label>Når?</label>
-<input id="when" type="datetime-local">
-<div class="row">
-<button class="btn" onclick="keyboardDictation()">⌨️ Skriv eller dikter</button>
-<button class="btn gold" onclick="saveReminder()">➕ Legg til</button>
-</div>
-<div id="status" class="status"></div>
-<div class="small">Ett trykk: Si «Legen klokken 8». Påminnelsen lagres automatisk med alarm én time før. Kalenderfilen lastes ned. Åpne den og bekreft «Legg til i Kalender» for alarm når appen er lukket.</div>
-<div class="small">Eksempel: «Lege klokken 8 i dag», «Ring Petra i morgen klokken 9», «Kjøp melk om 30 minutter».</div>
+<div id="status" class="status" role="status" aria-live="polite"></div>
+<div class="small">Si for eksempel «Legen klokken åtte i morgen». Lagres automatisk. Alarm én time før.</div>
+<div class="small">Varsel med lukket app krever at du legger påminnelsen i Kalender via knappen nedenfor.</div>
 </div>
 
 <div class="card"><h2>Mine påminnelser</h2><div id="list"></div></div>
@@ -81,8 +75,8 @@ function saveReminder(auto=false){
  const p=parseNatural(text), manual=$("when").value, when=manual?new Date(manual).getTime():(p&&p.when), title=(p&&p.clean)||text;
  if(!when||when<=Date.now()){$("status").textContent='Jeg forstod ikke tidspunktet. Prøv «klokken 8 i dag».';return}
  const reminder={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),text:title,when,alertAt:when-3600000,done:false,fired:false};
- reminders.push(reminder);persist();render();schedule();$("text").value="";$("when").value="";$("detected").style.display="none";$("status").textContent=`Lagret ${auto?"automatisk ":""}✓ Avtale: ${fmt(when)} • Alarm: ${fmt(when-3600000)}. Bekreft kalenderfilen for alarm når appen er lukket.`;
- downloadCalendar(reminder);
+ reminders.push(reminder);persist();render();schedule();$("text").value="";$("when").value="";$("detected").style.display="none";$("status").textContent=`Lagret ${auto?"automatisk ":""}✓ Avtale: ${fmt(when)} • Alarm: ${fmt(when-3600000)}. Bruk Kalender-knappen for alarm når appen er lukket.`;
+
 }
 function startSpeech(){
  if(recognition){recognition.stop();return}
@@ -91,15 +85,14 @@ function startSpeech(){
  const rec=new SR(); recognition=rec;rec.lang="nb-NO";rec.continuous=false;rec.interimResults=true;rec.maxAlternatives=1;
  let heard=false, saved=false;
  $("text").value="";$("when").value="";
- function reset(){clearTimeout(speechTimeout);if(recognition===rec)recognition=null;$("speakBtn").textContent="🎤 Snakk norsk"}
+ function reset(){clearTimeout(speechTimeout);if(recognition===rec)recognition=null;$("speakBtn").textContent="🎤 Snakk"}
  rec.onstart=()=>{$("speakBtn").textContent="⏹️ Stopp";$("status").textContent="Lytter på norsk …"};
  rec.onresult=e=>{let spoken="";for(let i=0;i<e.results.length;i++)spoken+=e.results[i][0].transcript+" ";if(saved)return;heard=true;$("text").value=spoken.trim();preview();if(Array.from(e.results).every(r=>r.isFinal)){if(parseNatural(spoken)){saved=true;saveReminder(true);rec.stop()}else $("status").textContent="Jeg forstod ikke tiden. Si for eksempel: Legen klokken åtte i morgen."}else $("status").textContent="Lytter på norsk …";};
- rec.onerror=e=>{reset();const messages={"not-allowed":"Tillat mikrofon og talegjenkjenning i Safari. Kontroller også at Siri er aktivert.","service-not-allowed":"Talegjenkjenning er ikke tillatt. Åpne i Safari og kontroller Siri-innstillingene.","language-not-supported":"Norsk talegjenkjenning er ikke tilgjengelig på denne enheten.","no-speech":"Jeg hørte ingen tale. Trykk Snakk norsk og prøv igjen.","network":"Talegjenkjenningen fikk en nettverksfeil. Prøv igjen."};$("status").textContent=messages[e.error]||"Talegjenkjenning feilet: "+e.error};
- rec.onend=()=>{reset();if(!heard&&$("status").textContent==="Lytter på norsk …")$("status").textContent="Ingen tale ble registrert. Trykk Snakk norsk og prøv igjen."};
+ rec.onerror=e=>{reset();const messages={"not-allowed":"Tillat mikrofon og talegjenkjenning i Safari. Kontroller også at Siri er aktivert.","service-not-allowed":"Talegjenkjenning er ikke tillatt. Åpne i Safari og kontroller Siri-innstillingene.","language-not-supported":"Norsk talegjenkjenning er ikke tilgjengelig på denne enheten.","no-speech":"Jeg hørte ingen tale. Trykk Snakk og prøv igjen.","network":"Talegjenkjenningen fikk en nettverksfeil. Prøv igjen."};$("status").textContent=messages[e.error]||"Talegjenkjenning feilet: "+e.error};
+ rec.onend=()=>{reset();if(!heard&&$("status").textContent==="Lytter på norsk …")$("status").textContent="Ingen tale ble registrert. Trykk Snakk og prøv igjen."};
  $("status").textContent="Starter norsk talegjenkjenning …";
  try{rec.start();speechTimeout=setTimeout(()=>{if(recognition===rec){rec.abort();reset();if(!heard)$("status").textContent="Talegjenkjenningen svarte ikke. Åpne i Safari og kontroller at Siri er aktivert."}},20000)}catch(e){reset();$("status").textContent="Kunne ikke starte talegjenkjenning. Prøv i Safari."}
 }
-function keyboardDictation(){$("text").focus();$("status").textContent="Trykk på mikrofonen på iPhone-tastaturet og si hele påminnelsen."}
 function icsEscape(value){return String(value).replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
 function icsDate(date){return date.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"")}
 function downloadCalendar(r){
