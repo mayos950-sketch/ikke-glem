@@ -25,3 +25,21 @@ check(spokenAddress.text, 8, 8)
 precondition(NorwegianDateParser.splitAddress("Legen klokken åtte i morgen").address == nil)
 precondition(NorwegianDateParser.splitAddress("Ring Petra i morgen klokken ni, adressen er Kirkegata 4 Oslo").address == "Kirkegata 4 Oslo")
 print("Spoken address extraction checks passed")
+
+func checkAlert(_ input: String, _ day: Int, _ hour: Int, _ minute: Int = 0) {
+    guard let parsed = NorwegianDateParser.parseSpoken(input, now: now, calendar: calendar) else { fatalError("No spoken result: \(input)") }
+    let parts = calendar.dateComponents([.day, .hour, .minute], from: parsed.alert)
+    precondition(parts.day == day && parts.hour == hour && parts.minute == minute, input)
+}
+checkAlert("Legen klokken åtte i morgen, minn meg på det 30 minutter før", 8, 7, 30)
+checkAlert("Legen klokken åtte i morgen, varsle meg klokken sju", 8, 7)
+checkAlert("Legen klokken åtte i morgen, minn meg to timer før", 8, 6)
+checkAlert("Legen klokken åtte i morgen, minn meg ved avtalen", 8, 8)
+checkAlert("Legen klokken åtte i morgen, minn meg en halvtime før", 8, 7, 30)
+checkAlert("Legen klokken åtte i morgen, minn meg 15 minutter før, adresse Storgata 12 Lillestrøm", 8, 7, 45)
+checkAlert("Legen klokken åtte i morgen, adresse Storgata 12 Lillestrøm, minn meg 15 minutter før", 8, 7, 45)
+precondition(NorwegianDateParser.parseSpoken("Legen klokken åtte i morgen, minn meg 15 minutter før, adresse Storgata 12 Lillestrøm", now: now, calendar: calendar)?.address == "Storgata 12 Lillestrøm")
+precondition(NorwegianDateParser.parseSpoken("Legen klokken åtte i morgen, minn meg kanskje før", now: now, calendar: calendar) == nil)
+precondition(NorwegianDateParser.parseSpoken("Legen klokken åtte i morgen, varsle meg klokken ni", now: now, calendar: calendar) == nil)
+precondition(NorwegianDateParser.parseSpoken("Legen klokken tretten i dag, minn meg to timer før", now: now, calendar: calendar) == nil)
+print("Custom notification time checks passed")
