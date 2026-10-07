@@ -1,0 +1,23 @@
+name: iOS build
+on:
+  push:
+    paths: ['ios/**', '.github/workflows/ios-build.yml']
+  pull_request:
+    paths: ['ios/**', '.github/workflows/ios-build.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Norwegian date parser
+        run: |
+          cat ios/IkkeGlem/NorwegianDateParser.swift ios/ParserTests.swift > /tmp/IkkeGlemParserTests.swift
+          swift /tmp/IkkeGlemParserTests.swift
+      - name: Build for iPhone Simulator
+        run: xcodebuild -project ios/IkkeGlem.xcodeproj -target IkkeGlem -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
