@@ -18,3 +18,10 @@ precondition(NorwegianDateParser.parse("Legen", now: now, calendar: calendar) ==
 let appointment = NorwegianDateParser.parse("Legen klokken åtte i morgen", now: now, calendar: calendar)!.date
 precondition(calendar.component(.hour, from: appointment.addingTimeInterval(-3600)) == 7)
 print("Norwegian date parser checks passed")
+
+let spokenAddress = NorwegianDateParser.splitAddress("Legen klokken åtte i morgen, adresse Storgata 12, Lillestrøm")
+precondition(spokenAddress.address == "Storgata 12, Lillestrøm")
+check(spokenAddress.text, 8, 8)
+precondition(NorwegianDateParser.splitAddress("Legen klokken åtte i morgen").address == nil)
+precondition(NorwegianDateParser.splitAddress("Ring Petra i morgen klokken ni, adressen er Kirkegata 4 Oslo").address == "Kirkegata 4 Oslo")
+print("Spoken address extraction checks passed")
