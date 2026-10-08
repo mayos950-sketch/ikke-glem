@@ -16,7 +16,7 @@
 h1{margin:8px 0 2px}.tag,.small{color:var(--muted)}label{display:block;font-weight:700;margin:8px 0 6px}textarea,input{width:100%;border:1px solid #384665;background:#0d1425;color:#fff;border-radius:14px;padding:14px;font-size:17px}
 textarea{min-height:92px}.dictation-field{display:none;margin-bottom:10px}.dictation-field.show{display:block}.btn{width:100%;border:0;border-radius:14px;padding:14px 16px;font-size:17px;font-weight:800;background:#2563eb;color:#fff;margin-top:10px}.listen{background:#059669}.gold{background:linear-gradient(#ffe487,#f3b620);color:#17120b}
 .row{display:flex;gap:10px}.row>*{flex:1}.status{margin-top:8px;color:#cbd5e1;min-height:20px}.detected{display:none;margin-top:8px;padding:10px;border-radius:12px;background:#0d1425;border:1px solid #384665;color:#dbeafe}
-.item{padding:13px 0;border-bottom:1px solid #ffffff14}.item-title{font-size:18px;font-weight:800}.item-time{font-size:14px;color:var(--gold);margin-top:5px}.item-actions{display:flex;gap:8px;margin-top:10px}.item-actions button{flex:1;border:0;border-radius:10px;padding:10px;font-weight:800}.empty{text-align:center;color:var(--muted);padding:18px}.build-label{display:inline-block;margin-top:10px;padding:6px 12px;background:#162743;border:1px solid #6c8ec4;border-radius:99px;color:#e4f0ff;font-size:15px;font-weight:700}.sound-test{margin-top:12px;border:1px solid #6c8ec4;background:#162743;color:#fff;border-radius:12px;padding:10px 14px;font-weight:700;font-size:15px}.version{position:fixed;z-index:2;right:10px;top:8px;font-size:10px;color:#94a3b8}
+.item{padding:13px 0;border-bottom:1px solid #ffffff14}.item-title{font-size:18px;font-weight:800}.item-time{font-size:14px;color:var(--gold);margin-top:5px}.item-actions{display:flex;gap:8px;margin-top:10px}.item-actions button{flex:1;border:0;border-radius:10px;padding:10px;font-weight:800}.empty{text-align:center;color:var(--muted);padding:18px}.privacy-note{margin-top:12px;padding:10px 12px;border-radius:12px;background:#322916;border:1px solid #9f762d;color:#ffe9af;font-size:14px;line-height:1.4}
 @media(max-width:520px){.row{flex-direction:column}}
 </style>
 </head>
@@ -33,7 +33,8 @@ textarea{min-height:92px}.dictation-field{display:none;margin-bottom:10px}.dicta
 <div id="detected" class="detected"></div>
 <div id="status" class="status" role="status" aria-live="polite"></div>
 <div class="small">Si for eksempel «Legen klokken 18 i dag, minn meg klokken 17:41». Den grønne knappen prøver å lytte direkte. Si selv når alarmen skal komme.</div>
-<div class="small">Varsel med lukket app krever at du legger påminnelsen i Kalender via knappen nedenfor.</div><button class="sound-test" type="button" onclick="playFanfare()">🔊 Test alarmlyd</button>
+<div class="privacy-note">Ikke si sensitive opplysninger som passord, kontonummer eller kortnummer.</div>
+<div class="small">Varsel med lukket app krever at du legger påminnelsen i Kalender via knappen nedenfor.</div>
 </div>
 
 <div class="card"><h2>Mine påminnelser</h2><div id="list"></div></div>
