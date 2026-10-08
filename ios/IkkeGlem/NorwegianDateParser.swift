@@ -58,8 +58,10 @@ enum NorwegianDateParser {
             } else {
                 requested = appointment.date.addingTimeInterval(-Double(amount) * (unit.hasPrefix("time") ? 3600 : 60))
             }
-        } else if alarm.hasPrefix("klokken") || alarm.hasPrefix("klocken") || alarm.hasPrefix("klokka") || alarm.hasPrefix("kl.") || alarm.range(of: #"^\d{4}$|^\d{1,2}[:.]\d{2}$"#, options: .regularExpression) != nil {
-            guard let parsed = parse("Varsel " + alarm + " i dag", now: appointment.date, calendar: calendar) else { return nil }
+        } else if alarm.range(of: #"\b(?:klokken|klocken|klokka|kl\.?|\d{4}|\d{1,2}[:.]\d{2})\b"#, options: .regularExpression) != nil || alarm.range(of: #"^\d{1,2}\s+\d{2}$"#, options: .regularExpression) != nil {
+            let hasDay = alarm.range(of: #"\b(?:i\s+dag|idag|i\s+morgen|imorgen|overmorgen)\b"#, options: .regularExpression) != nil
+            let expression = "Varsel " + alarm + (hasDay ? "" : " i dag")
+            guard let parsed = parse(expression, now: hasDay ? now : appointment.date, calendar: calendar) else { return nil }
             requested = parsed.date
         } else { return nil }
         guard requested <= appointment.date else { return nil }
@@ -77,7 +79,7 @@ enum NorwegianDateParser {
             .replacingOccurrences(of: #"\bimorgen\b"#, with: "i morgen", options: .regularExpression)
         // Accept common mixed-language spellings produced by dictation.
         let aliases = [
-            ("morgen früh", "i morgen tidlig"), ("morgen mittag", "i morgen middag"),
+            ("morgen früh", "i morgen tidlig"), ("i morgon", "i morgen"), ("imorgon", "i morgen"), ("morgen mittag", "i morgen middag"),
             ("morgen abend", "i morgen kveld"), ("heute morgen", "i dag morges"),
             ("heute mittag", "i dag middag"), ("heute abend", "i dag kveld"),
             ("halbe stunde", "en halvtime"), ("halben stunde", "en halvtime"),
@@ -116,6 +118,30 @@ enum NorwegianDateParser {
         if let g = match(#"\bom\s+(\d+|en|ett|et|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|femten|tjue|tretti)\s*[.!?,]?\s*$"#),
            let amount = number(g[1]), (1...10080).contains(amount) {
             return Parsed(title: title(removing: [g[0]]), date: now.addingTimeInterval(Double(amount * 60)))
+        }
+        // Dictation can return clock numbers as words, including "femti sju" and "tjue to".
+        // Convert only after relative expressions ("om fem minutter") have been handled.
+        let units: [String: Int] = ["null":0,"en":1,"ett":1,"et":1,"éin":1,"ein":1,"to":2,"tre":3,"fire":4,"fem":5,"seks":6,"sju":7,"syv":7,"åtte":8,"atte":8,"ni":9]
+        let tens: [String: Int] = ["tjue":20,"tretti":30,"førti":40,"femti":50]
+        var clockWords = words
+        for (ten, base) in tens {
+            for (unit, value) in units where value > 0 {
+                clockWords[ten + unit] = base + value
+                clockWords[ten + "-" + unit] = base + value
+            }
+        }
+        let combined = try! NSRegularExpression(pattern: #"\b(tjue|tretti|førti|femti)[ -]+(en|ett|et|éin|ein|to|tre|fire|fem|seks|sju|syv|åtte|atte|ni)\b"#)
+        for match in combined.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
+            guard let range = Range(match.range, in: text),
+                  let tenRange = Range(match.range(at: 1), in: text),
+                  let unitRange = Range(match.range(at: 2), in: text),
+                  let base = tens[String(text[tenRange])], let unit = units[String(text[unitRange])] else { continue }
+            text.replaceSubrange(range, with: String(base + unit))
+        }
+        let wordRegex = try! NSRegularExpression(pattern: #"\b[a-zæøåé-]+\b"#)
+        for match in wordRegex.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
+            guard let range = Range(match.range, in: text), let value = clockWords[String(text[range])] else { continue }
+            text.replaceSubrange(range, with: String(value))
         }
         var hour: Int?; var minute = 0; var timeFragment = ""
         if let g = match(#"\b(?:(?:klokken|klocken|klokka|kl\.?)\s*)?(\d{1,2})[:.\s](\d{2})\b"#) {
