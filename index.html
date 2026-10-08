@@ -22,7 +22,7 @@ textarea{min-height:92px}.dictation-field{display:none;margin-bottom:10px}.dicta
 </head>
 <body>
 <div class="scene-bg" aria-hidden="true"></div>
-<div class="version">v29</div>
+<div class="version">v30</div>
 <div class="wrap">
 <div class="hero"><img class="logo" src="icon-192.png"><h1>ikke glem by MP</h1><div class="tag">Bare si det – så husker vi det for deg.</div></div>
 
@@ -32,7 +32,7 @@ textarea{min-height:92px}.dictation-field{display:none;margin-bottom:10px}.dicta
 <button class="btn listen" id="speakBtn" onclick="startSpeech()" aria-label="Snakk"><img src="voice-button.png" alt="" style="height:130px;width:130px;object-fit:contain"></button>
 <div id="detected" class="detected"></div>
 <div id="status" class="status" role="status" aria-live="polite"></div>
-<div class="small">Si for eksempel «Legen klokken åtte i morgen». Den grønne knappen prøver å lytte direkte. Hvis iPhone ikke tillater det, kan du bruke tastaturmikrofonen. Alarm én time før.</div>
+<div class="small">Si for eksempel «Legen klokken 18 i dag, minn meg klokken 17:41». Den grønne knappen prøver å lytte direkte. Si selv når alarmen skal komme.</div>
 <div class="small">Varsel med lukket app krever at du legger påminnelsen i Kalender via knappen nedenfor.</div>
 </div>
 
@@ -50,35 +50,90 @@ function pad(n){return String(n).padStart(2,"0")}
 function fmt(ts){return new Date(ts).toLocaleString("nb-NO",{dateStyle:"medium",timeStyle:"short"})}
 function toLocal(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`}
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-function num(s){const m={en:1,ett:1,to:2,tre:3,fire:4,fem:5,seks:6,sju:7,syv:7,"åtte":8,atte:8,ni:9,ti:10,elleve:11,tolv:12,tretten:13,fjorten:14,femten:15,seksten:16,sytten:17,atten:18,nitten:19,tjue:20};return /^\d+$/.test(s)?Number(s):m[s]}
-function timePart(t){
- let m=t.match(/\b(?:klokken|klocken|klokka|kl\.?)\s*([0-2]?\d|[a-zæøå]+)(?:[:.]([0-5]\d))?\b/i);
- if(m){const h=num(m[1].toLowerCase());if(Number.isInteger(h)&&h>=0&&h<24)return{h,min:Number(m[2]||0),raw:m[0]}}
- m=t.match(/\bhalv\s+([0-2]?\d|[a-zæøå]+)\b/i);if(m){let h=num(m[1].toLowerCase());if(Number.isInteger(h))return{h:(h+23)%24,min:30,raw:m[0]}}
+function spokenNumber(value) {
+ const words={null:0,en:1,ett:1,et:1,to:2,tre:3,fire:4,fem:5,seks:6,sju:7,syv:7,"åtte":8,atte:8,ni:9,ti:10,elleve:11,tolv:12,tretten:13,fjorten:14,femten:15,seksten:16,sytten:17,atten:18,nitten:19,tjue:20,tretti:30,"førti":40,femti:50};
+ const s=value.toLowerCase().replace(/[ -]/g,"");
+ if(/^\d+$/.test(s))return Number(s);
+ if(words[s]!==undefined)return words[s];
+ for(const [name,base] of Object.entries({tjue:20,tretti:30,"førti":40,femti:50})) {
+  if(s.startsWith(name)&&words[s.slice(name.length)]>0&&words[s.slice(name.length)]<10)return base+words[s.slice(name.length)];
+ }
+ return undefined;
+}
+function normalDay(s){return s.toLowerCase().replace(/\bidag\b/g,"i dag").replace(/\bimorgen\b|\bi morgon\b|\bimorgon\b/g,"i morgen")}
+function clockPart(s){
+ const number="(?:[0-9]{1,2}|[a-zæøå]+(?:[ -](?:en|ett|et|to|tre|fire|fem|seks|sju|syv|åtte|ni))?)";
+ let m=s.match(/\b(?:klokken|klocken|klokka|kl\.?)\s*([0-9]{1,2})[:.\s]([0-5][0-9])\b/i)
+  ||s.match(/\b([0-9]{1,2})[:.\s]([0-5][0-9])\b/i);
+ if(m){const h=Number(m[1]),min=Number(m[2]);if(h<24)return{h,min,raw:m[0]};return null}
+ m=s.match(/\b(?:(?:klokken|klocken|klokka|kl\.?)\s*)?([01][0-9]|2[0-3])([0-5][0-9])\b/i);
+ if(m)return{h:Number(m[1]),min:Number(m[2]),raw:m[0]};
+ const wordClock=new RegExp("\\b(?:(?:klokken|klocken|klokka|kl\\.?)\\s*)?("+number+")\\s+("+number+")\\b","gi");
+ for(const candidate of s.matchAll(wordClock)){
+  const h=spokenNumber(candidate[1]),min=spokenNumber(candidate[2]);
+  if(Number.isInteger(h)&&h<24&&Number.isInteger(min)&&min<60)return{h,min,raw:candidate[0]};
+ }
+ const prefix=new RegExp("\\b(?:klokken|klocken|klokka|kl\\.?)\\s*("+number+")\\b","i");
+ m=s.match(prefix);
+ if(m){const h=spokenNumber(m[1]);if(Number.isInteger(h)&&h<24)return{h,min:0,raw:m[0]}}
+ m=s.match(/\bhalv\s+([0-9]{1,2}|[a-zæøå]+)\b/i);
+ if(m){const h=spokenNumber(m[1]);if(Number.isInteger(h)&&h>=1&&h<=24)return{h:(h+23)%24,min:30,raw:m[0]}}
+ const bare=new RegExp("\\b("+number+")(?=\\s+(?:i dag|i morgen|overmorgen)\\b|\\s*$)","i");
+ m=s.match(bare);
+ if(m){const h=spokenNumber(m[1]);if(Number.isInteger(h)&&h<24)return{h,min:0,raw:m[0]}}
  return null;
 }
-function parseNatural(text){
- const t=text.toLowerCase().trim(), now=new Date(); let d=new Date(now),m;
- m=t.match(/\bom\s+(en|ett|\d+)\s*(?:minutt|minutter|min)\b/);if(m){const n=(m[1]==="en"||m[1]==="ett")?1:Number(m[1]);return{when:Date.now()+n*60000,clean:text.replace(m[0],"").trim()}}
- m=t.match(/\bom\s+(en|ett|\d+)\s*(?:time|timer)\b/);if(m){const n=(m[1]==="en"||m[1]==="ett")?1:Number(m[1]);return{when:Date.now()+n*3600000,clean:text.replace(m[0],"").trim()}}
- const hm=timePart(t); let off=null,raw="";
- if(/\bi dag\b/.test(t)){off=0;raw="i dag"} else if(/\bi morgen\b/.test(t)){off=1;raw="i morgen"} else if(/\bovermorgen\b/.test(t)){off=2;raw="overmorgen"}
- if(off!==null){d.setDate(d.getDate()+off);if(hm)d.setHours(hm.h,hm.min,0,0);else d.setHours(off===1?8:9,0,0,0);let clean=text;if(hm)clean=clean.replace(hm.raw,"");clean=clean.replace(raw,"").replace(/\s{2,}/g," ").trim();return{when:d.getTime(),clean}}
- if(hm){d.setHours(hm.h,hm.min,0,0);if(d<=now)d.setDate(d.getDate()+1);return{when:d.getTime(),clean:text.replace(hm.raw,"").replace(/\s{2,}/g," ").trim()}}
- return null;
+function parseNatural(input,nowMs=Date.now()){
+ const s=normalDay(input.trim()),now=new Date(nowMs);let m;
+ m=s.match(/\bom\s+(en|ett|et|\d+|[a-zæøå]+)\s*(minutt(?:er)?|minut(?:ter|e)?|min|time(?:r)?)\b/i);
+ if(m){const n=spokenNumber(m[1]);if(Number.isInteger(n)&&n>0){const minutes=n*(m[2].startsWith("time")?60:1);return{when:nowMs+minutes*60000,clean:s.replace(m[0],"").trim(),relative:true}}}
+ m=s.match(/\bom\s+(?:(?:et|ett|en)\s+)?(kvarter|halvtime|time)\b/i);
+ if(m){const minutes=m[1]==="kvarter"?15:m[1]==="halvtime"?30:60;return{when:nowMs+minutes*60000,clean:s.replace(m[0],"").trim(),relative:true}}
+ const day=s.match(/\b(i dag|i morgen|overmorgen)\b/),offset=day?(day[1]==="i dag"?0:day[1]==="i morgen"?1:2):null;
+ const clock=clockPart(s);if(!clock&&offset===null)return null;
+ const d=new Date(now);if(offset!==null)d.setDate(d.getDate()+offset);
+ d.setHours(clock?clock.h:(offset===1?8:9),clock?clock.min:0,0,0);
+ if(offset===null&&d.getTime()<=nowMs)d.setDate(d.getDate()+1);
+ const clean=s.replace(clock?clock.raw:"","").replace(day?day[0]:"","").replace(/\s+/g," ").replace(/^[\s,.:;]+|[\s,.:;]+$/g,"").trim();
+ return{when:d.getTime(),clean,explicitDay:offset!==null};
+}
+function parseReminder(text,nowMs=Date.now()){
+ const marker=/\b(?:minn(?:e)? meg(?: på det)?|minner meg(?: på det)?|varsle meg|påminn meg(?: på det)?)\b/i;
+ const m=marker.exec(text);const titlePart=m?text.slice(0,m.index).replace(/[\s,.:;]+$/g,"").trim():text;
+ const alarmPart=m?text.slice(m.index+m[0].length).replace(/^[\s,.:;]+/g,"").trim():"";
+ const direct=!!m&&!titlePart;
+ const p=parseNatural(direct?alarmPart:titlePart,nowMs);
+ if(!p||p.when<=nowMs)return null;
+ let alertAt=direct?p.when:Math.max(p.when-3600000,nowMs+5000),custom=direct;
+ if(m&&!direct){
+  const a=normalDay(alarmPart),before=a.match(/\b(\d+|[a-zæøå]+)\s*(minutt(?:er)?|minut(?:ter|e)?|min|time(?:r)?)\s+før\b/);
+  if(/\b(?:ved avtalen|på slaget)\b/.test(a)){alertAt=p.when;custom=true}
+  else if(/\b(?:en\s+)?halvtime\s+før\b/.test(a)){alertAt=p.when-1800000;custom=true}
+  else if(before){const n=spokenNumber(before[1]);if(!Number.isInteger(n))return null;alertAt=p.when-n*(before[2].startsWith("time")?3600000:60000);custom=true}
+  else {
+   const hasDay=/\b(?:i dag|i morgen|overmorgen)\b/.test(a);
+   const alarm=parseNatural(hasDay?a:a+" i dag",hasDay?nowMs:p.when);
+   if(!alarm)return null;
+   alertAt=alarm.when;custom=true;
+  }
+  if(alertAt<=nowMs&&Math.floor(alertAt/60000)===Math.floor(nowMs/60000))alertAt=nowMs+5000;
+  if(alertAt<=nowMs||alertAt>p.when)return null;
+ }
+ return{when:p.when,alertAt,title:p.clean||"Påminnelse",custom};
 }
 function preview(){
- const text=$("text").value.trim(), p=parseNatural(text), box=$("detected");
+ const text=$("text").value.trim(), p=parseReminder(text), box=$("detected");
  if(!text){box.style.display="none";return}
- if(p){$("when").value=toLocal(new Date(p.when));box.textContent=`Forstått: ${p.clean||text} • ${fmt(p.when)}`;box.style.display="block"}
+ if(p){$("when").value=toLocal(new Date(p.when));box.textContent=`Forstått: ${p.title} • Avtale ${fmt(p.when)} • Alarm ${fmt(p.alertAt)}`;box.style.display="block"}
  else{box.textContent="Jeg finner ingen tydelig tid ennå.";box.style.display="block"}
 }
 function saveReminder(auto=false){
  const text=$("text").value.trim(); if(!text){$("status").textContent="Si eller skriv en påminnelse.";return}
- const p=parseNatural(text), manual=$("when").value, when=manual?new Date(manual).getTime():(p&&p.when), title=(p&&p.clean)||text;
- if(!when||when<=Date.now()){$("status").textContent='Jeg forstod ikke tidspunktet. Prøv «klokken 8 i dag».';return}
- const reminder={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),text:title,when,alertAt:when-3600000,done:false,fired:false};
- reminders.push(reminder);persist();render();schedule();$("text").value="";$("text").classList.remove("show");$("when").value="";$("detected").style.display="none";$("status").textContent=`Lagret ${auto?"automatisk ":""}✓ Avtale: ${fmt(when)} • Alarm: ${fmt(when-3600000)}. Bruk Kalender-knappen for alarm når appen er lukket.`;
+ const p=parseReminder(text);
+ if(!p){$("status").textContent='Jeg forstod ikke avtalen eller alarmtiden. Prøv «Legen klokken 18 i dag, minn meg klokken 17:41».';return}
+ const when=p.when, alertAt=p.alertAt, title=p.title;
+ const reminder={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),text:title,when,alertAt,done:false,fired:false};
+ reminders.push(reminder);persist();render();schedule();$("text").value="";$("text").classList.remove("show");$("when").value="";$("detected").style.display="none";$("status").textContent=`Lagret ${auto?"automatisk ":""}✓ Avtale: ${fmt(when)} • Alarm: ${fmt(alertAt)}. Bruk Kalender-knappen for alarm når appen er lukket.`;
 
 }
 function isIOS(){
@@ -97,11 +152,11 @@ let dictationSaveTimer=null;
 function scheduleDictationSave(){
  clearTimeout(dictationSaveTimer);
  const field=$("text");
- const p=parseNatural(field.value.trim());
+ const p=parseReminder(field.value.trim());
  if(!p)return;
  dictationSaveTimer=setTimeout(()=>{
-   if(field.value.trim() && parseNatural(field.value.trim())) saveReminder(true);
- },1200);
+   if(field.value.trim() && parseReminder(field.value.trim())) saveReminder(true);
+ },4000);
 }
 function startSpeech(){
  if(recognition){recognition.stop();return}
@@ -115,7 +170,7 @@ function startSpeech(){
  $("text").value="";$("when").value="";
  function reset(){clearTimeout(speechTimeout);if(recognition===rec)recognition=null;$("speakBtn").innerHTML='<img src="voice-button.png" alt="" style="height:130px;width:130px;object-fit:contain">'}
  rec.onstart=()=>{$("speakBtn").textContent="⏹️ Stopp";$("status").textContent="Lytter på norsk …"};
- rec.onresult=e=>{let spoken="";for(let i=0;i<e.results.length;i++)spoken+=e.results[i][0].transcript+" ";if(saved)return;heard=true;$("text").value=spoken.trim();preview();if(Array.from(e.results).every(r=>r.isFinal)){if(parseNatural(spoken)){saved=true;saveReminder(true);rec.stop()}else $("status").textContent="Jeg forstod ikke tiden. Si for eksempel: Legen klokken åtte i morgen."}else $("status").textContent="Lytter på norsk …";};
+ rec.onresult=e=>{let spoken="";for(let i=0;i<e.results.length;i++)spoken+=e.results[i][0].transcript+" ";if(saved)return;heard=true;$("text").value=spoken.trim();preview();if(Array.from(e.results).every(r=>r.isFinal)){if(parseReminder(spoken)){saved=true;saveReminder(true);rec.stop()}else $("status").textContent="Jeg forstod ikke tiden. Si for eksempel: Legen klokken åtte i morgen."}else $("status").textContent="Lytter på norsk …";};
  rec.onerror=e=>{if(saved&&e.error==="aborted"){reset();return}reset();if(isIOS()&&!heard&&["aborted","service-not-allowed","not-allowed"].includes(e.error)){openIOSDictation();return}const messages={"not-allowed":"Talegjenkjenning ble blokkert. Skriv eller bruk mikrofonen på tastaturet.","service-not-allowed":"Talegjenkjenning er ikke tilgjengelig. Skriv eller bruk mikrofonen på tastaturet.","language-not-supported":"Norsk talegjenkjenning er ikke tilgjengelig på denne enheten.","no-speech":"Jeg hørte ingen tale. Prøv igjen.","network":"Talegjenkjenningen fikk en nettverksfeil. Prøv igjen.","aborted":"Opptaket ble avbrutt. Prøv igjen."};$("status").textContent=messages[e.error]||"Talegjenkjenning feilet: "+e.error};
  rec.onend=()=>{reset();if(!heard&&$("status").textContent==="Lytter på norsk …")$("status").textContent="Ingen tale ble registrert. Prøv igjen."};
  $("status").textContent="Starter norsk talegjenkjenning …";
@@ -127,7 +182,7 @@ function downloadCalendar(r){
  const start=new Date(r.when), end=new Date(r.when+15*60000);
  const lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Ikke glem//NO","CALSCALE:GREGORIAN","METHOD:PUBLISH","BEGIN:VEVENT",
   "UID:"+r.id+"@ikke-glem","DTSTAMP:"+icsDate(new Date()),"DTSTART:"+icsDate(start),"DTEND:"+icsDate(end),
-  "SUMMARY:"+icsEscape(r.text),"DESCRIPTION:Påminnelse fra Ikke glem","BEGIN:VALARM","TRIGGER:-PT1H","ACTION:DISPLAY","DESCRIPTION:"+icsEscape(r.text),"END:VALARM","END:VEVENT","END:VCALENDAR"];
+  "SUMMARY:"+icsEscape(r.text),"DESCRIPTION:Påminnelse fra Ikke glem","BEGIN:VALARM","TRIGGER;VALUE=DATE-TIME:"+icsDate(new Date(r.alertAt??r.when-3600000)),"ACTION:DISPLAY","DESCRIPTION:"+icsEscape(r.text),"END:VALARM","END:VEVENT","END:VCALENDAR"];
  const blob=new Blob([lines.join("\r\n")+"\r\n"],{type:"text/calendar;charset=utf-8"});
  const url=URL.createObjectURL(blob), a=document.createElement("a");
  a.href=url;a.download="ikke-glem-"+new Date(r.when).toISOString().slice(0,10)+".ics";document.body.appendChild(a);a.click();a.remove();
