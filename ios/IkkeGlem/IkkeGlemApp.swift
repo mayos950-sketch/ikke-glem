@@ -27,6 +27,11 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             Color(red: 0.04, green: 0.07, blue: 0.14).ignoresSafeArea()
+            Image("forgetful-background")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+            Color.black.opacity(0.36).ignoresSafeArea()
             VStack(spacing: 22) {
                 Text("ikke glem by MP").font(.largeTitle.bold())
                 Text("Ett trykk. Si det. Ferdig.").foregroundStyle(.secondary)
@@ -37,7 +42,7 @@ struct ContentView: View {
                     }.frame(maxWidth: .infinity).padding(14)
                 }
                 .buttonStyle(.borderedProminent).tint(.green)
-                .disabled(model.busy || model.listening)
+                .disabled(model.busy)
                 .accessibilityLabel(model.listening ? "Lytter" : "Snakk")
                 Text(model.transcript).font(.title3).accessibilityLabel("Det du sa")
                 Text(model.status).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -86,7 +91,12 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
     }
 
     func tap() {
-        guard !busy && !listening else { return }
+        if listening {
+            stop()
+            status = "Opptaket ble stoppet."
+            return
+        }
+        guard !busy else { return }
         busy = true
         Task {
             defer { busy = false }
