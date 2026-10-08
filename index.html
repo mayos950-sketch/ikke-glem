@@ -22,7 +22,7 @@ textarea{min-height:92px}.dictation-field{display:none;margin-bottom:10px}.dicta
 </head>
 <body>
 <div class="scene-bg" aria-hidden="true"></div>
-<div class="version">v27</div>
+<div class="version">v28</div>
 <div class="wrap">
 <div class="hero"><img class="logo" src="icon-192.png"><h1>ikke glem by MP</h1><div class="tag">Bare si det – så husker vi det for deg.</div></div>
 
@@ -32,7 +32,7 @@ textarea{min-height:92px}.dictation-field{display:none;margin-bottom:10px}.dicta
 <button class="btn listen" id="speakBtn" onclick="startSpeech()" aria-label="Snakk"><img src="voice-button.png" alt="" style="height:130px;width:130px;object-fit:contain"></button>
 <div id="detected" class="detected"></div>
 <div id="status" class="status" role="status" aria-live="polite"></div>
-<div class="small">Si for eksempel «Legen klokken åtte i morgen». På iPhone åpner Snakk tekstfeltet – bruk mikrofonen på tastaturet. Lagres automatisk. Alarm én time før.</div>
+<div class="small">Si for eksempel «Legen klokken åtte i morgen». I Safari starter den grønne knappen talegjenkjenning med ett trykk. Lagres automatisk. Alarm én time før.</div>
 <div class="small">Varsel med lukket app krever at du legger påminnelsen i Kalender via knappen nedenfor.</div>
 </div>
 
@@ -89,7 +89,7 @@ function openIOSDictation(){
  const field=$("text");
  field.classList.add("show");
  field.focus();
- $("status").textContent="Bruk mikrofonen på iPhone-tastaturet. Når teksten er ferdig, lagres påminnelsen automatisk hvis tidspunktet blir forstått.";
+ $("status").textContent="På Hjem-skjermen krever iPhone et ekstra trykk på tastaturmikrofonen. Åpne lenken i Safari for opptak med ett trykk. Teksten lagres automatisk når tidspunktet blir forstått.";
 }
 let dictationSaveTimer=null;
 function scheduleDictationSave(){
@@ -102,7 +102,7 @@ function scheduleDictationSave(){
  },1200);
 }
 function startSpeech(){
- if(isIOS()){openIOSDictation();return}
+ if(isIOS() && navigator.standalone===true){openIOSDictation();return}
  if(recognition){recognition.stop();return}
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){openIOSDictation();return}
