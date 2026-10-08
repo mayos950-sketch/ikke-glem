@@ -58,7 +58,7 @@ enum NorwegianDateParser {
             } else {
                 requested = appointment.date.addingTimeInterval(-Double(amount) * (unit.hasPrefix("time") ? 3600 : 60))
             }
-        } else if alarm.range(of: #"\b(?:klokken|klocken|klokka|kl\.?|\d{4}|\d{1,2}[:.]\d{2})\b"#, options: .regularExpression) != nil || alarm.range(of: #"^\d{1,2}\s+\d{2}$"#, options: .regularExpression) != nil {
+        } else if alarm.hasPrefix("klokken") || alarm.hasPrefix("klocken") || alarm.hasPrefix("klokka") || alarm.hasPrefix("kl.") || alarm.range(of: #"\b(?:klokken|klocken|klokka|kl\.?|\d{4}|\d{1,2}[:.]\d{2})\b"#, options: .regularExpression) != nil || alarm.range(of: #"^\d{1,2}\s+\d{2}$"#, options: .regularExpression) != nil {
             let hasDay = alarm.range(of: #"\b(?:i\s+dag|idag|i\s+morgen|imorgen|overmorgen)\b"#, options: .regularExpression) != nil
             let expression = "Varsel " + alarm + (hasDay ? "" : " i dag")
             guard let parsed = parse(expression, now: hasDay ? now : appointment.date, calendar: calendar) else { return nil }
