@@ -16,15 +16,15 @@
 h1{margin:8px 0 2px}.tag,.small{color:var(--muted)}label{display:block;font-weight:700;margin:8px 0 6px}textarea,input{width:100%;border:1px solid #384665;background:#0d1425;color:#fff;border-radius:14px;padding:14px;font-size:17px}
 textarea{min-height:92px}.dictation-field{display:none;margin-bottom:10px}.dictation-field.show{display:block}.btn{width:100%;border:0;border-radius:14px;padding:14px 16px;font-size:17px;font-weight:800;background:#2563eb;color:#fff;margin-top:10px}.listen{background:#059669}.gold{background:linear-gradient(#ffe487,#f3b620);color:#17120b}
 .row{display:flex;gap:10px}.row>*{flex:1}.status{margin-top:8px;color:#cbd5e1;min-height:20px}.detected{display:none;margin-top:8px;padding:10px;border-radius:12px;background:#0d1425;border:1px solid #384665;color:#dbeafe}
-.item{padding:13px 0;border-bottom:1px solid #ffffff14}.item-title{font-size:18px;font-weight:800}.item-time{font-size:14px;color:var(--gold);margin-top:5px}.item-actions{display:flex;gap:8px;margin-top:10px}.item-actions button{flex:1;border:0;border-radius:10px;padding:10px;font-weight:800}.empty{text-align:center;color:var(--muted);padding:18px}.build-label{display:inline-block;margin-top:10px;padding:6px 12px;background:#162743;border:1px solid #6c8ec4;border-radius:99px;color:#e4f0ff;font-size:15px;font-weight:700}.version{position:fixed;z-index:2;right:10px;top:8px;font-size:10px;color:#94a3b8}
+.item{padding:13px 0;border-bottom:1px solid #ffffff14}.item-title{font-size:18px;font-weight:800}.item-time{font-size:14px;color:var(--gold);margin-top:5px}.item-actions{display:flex;gap:8px;margin-top:10px}.item-actions button{flex:1;border:0;border-radius:10px;padding:10px;font-weight:800}.empty{text-align:center;color:var(--muted);padding:18px}.build-label{display:inline-block;margin-top:10px;padding:6px 12px;background:#162743;border:1px solid #6c8ec4;border-radius:99px;color:#e4f0ff;font-size:15px;font-weight:700}.sound-test{margin-top:12px;border:1px solid #6c8ec4;background:#162743;color:#fff;border-radius:12px;padding:10px 14px;font-weight:700;font-size:15px}.version{position:fixed;z-index:2;right:10px;top:8px;font-size:10px;color:#94a3b8}
 @media(max-width:520px){.row{flex-direction:column}}
 </style>
 </head>
 <body>
 <div class="scene-bg" aria-hidden="true"></div>
-<div class="version">v31</div>
+
 <div class="wrap">
-<div class="hero"><img class="logo" src="icon-192.png"><h1>ikke glem by MP</h1><div class="tag">Bare si det – så husker vi det for deg.</div><div class="build-label">Versjon 31 · Alarm på tidspunktet du sier</div></div>
+<div class="hero"><img class="logo" src="icon-192.png"><h1>ikke glem by MP</h1><div class="tag">Bare si det – så husker vi det for deg.</div></div>
 
 <div class="card">
 <textarea id="text" class="dictation-field" placeholder="Trykk på mikrofonen på iPhone-tastaturet og snakk"></textarea>
@@ -33,7 +33,7 @@ textarea{min-height:92px}.dictation-field{display:none;margin-bottom:10px}.dicta
 <div id="detected" class="detected"></div>
 <div id="status" class="status" role="status" aria-live="polite"></div>
 <div class="small">Si for eksempel «Legen klokken 18 i dag, minn meg klokken 17:41». Den grønne knappen prøver å lytte direkte. Si selv når alarmen skal komme.</div>
-<div class="small">Varsel med lukket app krever at du legger påminnelsen i Kalender via knappen nedenfor.</div>
+<div class="small">Varsel med lukket app krever at du legger påminnelsen i Kalender via knappen nedenfor.</div><button class="sound-test" type="button" onclick="playFanfare()">🔊 Test alarmlyd</button>
 </div>
 
 <div class="card"><h2>Mine påminnelser</h2><div id="list"></div></div>
@@ -166,6 +166,7 @@ function scheduleDictationSave(){
  },4000);
 }
 function startSpeech(){
+ unlockSound();
  if(recognition){recognition.stop();return}
  clearTimeout(dictationSaveTimer);
  $("text").value="";$("when").value="";$("detected").style.display="none";
@@ -199,9 +200,42 @@ function calendarById(id){const r=reminders.find(x=>x.id===id);if(r)downloadCale
 function render(){const b=$("list"),s=[...reminders].sort((a,b)=>a.when-b.when);if(!s.length){b.innerHTML='<div class="empty">Ingen påminnelser ennå.</div>';return}b.innerHTML=s.map(r=>`<div class="item"><div class="item-title">${esc(r.text)}</div><div class="item-time">Avtale: ${fmt(r.when)} • Alarm: ${fmt(r.alertAt??r.when)}</div><div class="item-actions"><button onclick="calendarById('${r.id}')">📅 Kalender</button><button onclick="done('${r.id}')">✅ Ferdig</button><button onclick="del('${r.id}')">🗑️ Slett</button></div></div>`).join("")}
 function done(id){const r=reminders.find(x=>x.id===id);if(r){r.done=true;persist();render()}}
 function del(id){reminders=reminders.filter(x=>x.id!==id);persist();render()}
-function fire(r){r.fired=true;persist();if(document.visibilityState==="visible")alert("Ikke glem!\n\n"+r.text)}
-function schedule(){if(timer)clearInterval(timer);timer=setInterval(()=>{const n=Date.now();reminders.forEach(r=>{if(!r.done&&!r.fired&&(r.alertAt??r.when)<=n)fire(r)})},5000)}
-$("text").addEventListener("input",()=>{preview();scheduleDictationSave()});
+let alarmAudio=null;
+function unlockSound(){
+ try{
+  if(!alarmAudio)alarmAudio=new (window.AudioContext||window.webkitAudioContext)();
+  if(alarmAudio.state==="suspended")alarmAudio.resume().catch(()=>{});
+  const source=alarmAudio.createOscillator(),gain=alarmAudio.createGain();
+  gain.gain.value=0;source.connect(gain);gain.connect(alarmAudio.destination);
+  source.start();source.stop(alarmAudio.currentTime+.01);
+ }catch(e){}
+}
+async function playFanfare(){
+ try{
+  unlockSound();
+  if(!alarmAudio)return;
+  if(alarmAudio.state==="suspended")await alarmAudio.resume();
+  if(alarmAudio.state!=="running")return;
+  const notes=[523.25,659.25,783.99,1046.5,783.99,1046.5];
+  const start=alarmAudio.currentTime+.03;
+  notes.forEach((frequency,i)=>{
+   const oscillator=alarmAudio.createOscillator(),gain=alarmAudio.createGain();
+   const t=start+i*.21;
+   oscillator.type="triangle";oscillator.frequency.value=frequency;
+   gain.gain.setValueAtTime(.0001,t);
+   gain.gain.exponentialRampToValueAtTime(.23,t+.035);
+   gain.gain.exponentialRampToValueAtTime(.0001,t+.19);
+   oscillator.connect(gain);gain.connect(alarmAudio.destination);
+   oscillator.start(t);oscillator.stop(t+.2);
+  });
+ }catch(e){}
+}
+function fire(r){r.fired=true;persist();playFanfare();setTimeout(()=>alert("Ikke glem!\n\n"+r.text),1450)}
+function checkDue(){if(document.visibilityState!=="visible")return;const n=Date.now();reminders.forEach(r=>{if(!r.done&&!r.fired&&(r.alertAt??r.when)<=n)fire(r)})}
+function schedule(){if(timer)clearInterval(timer);timer=setInterval(checkDue,5000)}
+document.addEventListener("visibilitychange",checkDue);
+document.addEventListener("pointerdown",unlockSound,{once:true});
+$("text").addEventListener("input",()=>{unlockSound();preview();scheduleDictationSave()});
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 render();schedule();
 </script>
