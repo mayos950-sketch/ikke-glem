@@ -34,7 +34,7 @@ textarea{min-height:92px}.dictation-field{display:none;margin-bottom:10px}.dicta
 <div id="status" class="status" role="status" aria-live="polite"></div>
 <div class="small">Si for eksempel «Legen klokken 18 i dag, minn meg klokken 17:41». Den grønne knappen prøver å lytte direkte. Si selv når alarmen skal komme.</div>
 <div class="privacy-note">Ikke si sensitive opplysninger som passord, kontonummer eller kortnummer.</div>
-<div class="small">Varsel med lukket app krever at du legger påminnelsen i Kalender via knappen nedenfor.</div>
+<div class="small">Alarmlyden fra nettsiden virker når appen er åpen. For varsler når den er lukket, bruk iPhone-appen.</div>
 </div>
 
 <div class="card"><h2>Mine påminnelser</h2><div id="list"></div></div>
@@ -140,7 +140,7 @@ function saveReminder(auto=false){
  if(!p){$("status").textContent='Jeg forstod ikke avtalen eller alarmtiden. Prøv «Legen klokken 18 i dag, minn meg klokken 17:41».';return}
  const when=p.when, alertAt=p.alertAt, title=p.title;
  const reminder={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())),text:title,when,alertAt,done:false,fired:false};
- reminders.push(reminder);persist();render();schedule();$("text").value="";$("text").classList.remove("show");$("when").value="";$("detected").style.display="none";$("status").textContent=`Lagret ${auto?"automatisk ":""}✓ Avtale: ${fmt(when)} • Alarm: ${fmt(alertAt)}. Bruk Kalender-knappen for alarm når appen er lukket.`;
+ reminders.push(reminder);persist();render();schedule();$("text").value="";$("text").classList.remove("show");$("when").value="";$("detected").style.display="none";$("status").textContent=`Lagret ${auto?"automatisk ":""}✓ Avtale: ${fmt(when)} • Alarm: ${fmt(alertAt)}. Alarmlyden virker når webappen er åpen.`;
 
 }
 function isIOS(){
@@ -191,20 +191,7 @@ function startSpeech(){
  $("status").textContent="Starter norsk talegjenkjenning …";
  try{rec.start();speechTimeout=setTimeout(()=>{if(recognition===rec){rec.abort();reset();if(!heard)$("status").textContent="Talegjenkjenningen svarte ikke. Skriv eller bruk mikrofonen på tastaturet."}},12000)}catch(e){reset();openIOSDictation()}
 }
-function icsEscape(value){return String(value).replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
-function icsDate(date){return date.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"")}
-function downloadCalendar(r){
- const start=new Date(r.when), end=new Date(r.when+15*60000);
- const lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Ikke glem//NO","CALSCALE:GREGORIAN","METHOD:PUBLISH","BEGIN:VEVENT",
-  "UID:"+r.id+"@ikke-glem","DTSTAMP:"+icsDate(new Date()),"DTSTART:"+icsDate(start),"DTEND:"+icsDate(end),
-  "SUMMARY:"+icsEscape(r.text),"DESCRIPTION:Påminnelse fra Ikke glem","BEGIN:VALARM","TRIGGER;VALUE=DATE-TIME:"+icsDate(new Date(r.alertAt??r.when)),"ACTION:DISPLAY","DESCRIPTION:"+icsEscape(r.text),"END:VALARM","END:VEVENT","END:VCALENDAR"];
- const blob=new Blob([lines.join("\r\n")+"\r\n"],{type:"text/calendar;charset=utf-8"});
- const url=URL.createObjectURL(blob), a=document.createElement("a");
- a.href=url;a.download="ikke-glem-"+new Date(r.when).toISOString().slice(0,10)+".ics";document.body.appendChild(a);a.click();a.remove();
- setTimeout(()=>URL.revokeObjectURL(url),60000);
-}
-function calendarById(id){const r=reminders.find(x=>x.id===id);if(r)downloadCalendar(r)}
-function render(){const b=$("list"),s=[...reminders].sort((a,b)=>a.when-b.when);if(!s.length){b.innerHTML='<div class="empty">Ingen påminnelser ennå.</div>';return}b.innerHTML=s.map(r=>`<div class="item"><div class="item-title">${esc(r.text)}</div><div class="item-time">Avtale: ${fmt(r.when)} • Alarm: ${fmt(r.alertAt??r.when)}</div><div class="item-actions"><button onclick="calendarById('${r.id}')">📅 Kalender</button><button onclick="done('${r.id}')">✅ Ferdig</button><button onclick="del('${r.id}')">🗑️ Slett</button></div></div>`).join("")}
+function render(){const b=$("list"),s=[...reminders].sort((a,b)=>a.when-b.when);if(!s.length){b.innerHTML='<div class="empty">Ingen påminnelser ennå.</div>';return}b.innerHTML=s.map(r=>`<div class="item"><div class="item-title">${esc(r.text)}</div><div class="item-time">Avtale: ${fmt(r.when)} • Alarm: ${fmt(r.alertAt??r.when)}</div><div class="item-actions"><button onclick="done('${r.id}')">✅ Ferdig</button><button onclick="del('${r.id}')">🗑️ Slett</button></div></div>`).join("")}
 function done(id){const r=reminders.find(x=>x.id===id);if(r){r.done=true;persist();render()}}
 function del(id){reminders=reminders.filter(x=>x.id!==id);persist();render()}
 let alarmAudio=null;
