@@ -67,7 +67,7 @@ function clockPart(s){
  let m=s.match(/\b(?:klokken|klocken|klokka|kl\.?)\s*([0-9]{1,2})[:.\s]([0-5][0-9])\b/i)
   ||s.match(/\b([0-9]{1,2})[:.\s]([0-5][0-9])\b/i);
  if(m){const h=Number(m[1]),min=Number(m[2]);if(h<24)return{h,min,raw:m[0]};return null}
- m=s.match(/\b(?:(?:klokken|klocken|klokka|kl\.?)\s*)?([01][0-9]|2[0-3])([0-5][0-9])\b/i);
+ m=s.match(/\b(?:(?:klokken|klocken|klokka|kl\.?)\s*)?([01][0-9]|2[0-3]|[0-9])([0-5][0-9])\b/i);
  if(m)return{h:Number(m[1]),min:Number(m[2]),raw:m[0]};
  const wordClock=new RegExp("\\b(?:(?:klokken|klocken|klokka|kl\\.?)\\s*)?("+number+")\\s+("+number+")\\b","gi");
  for(const candidate of s.matchAll(wordClock)){
@@ -103,7 +103,13 @@ function parseReminder(text,nowMs=Date.now()){
  const m=marker.exec(text);const titlePart=m?text.slice(0,m.index).replace(/[\s,.:;]+$/g,"").trim():text;
  const alarmPart=m?text.slice(m.index+m[0].length).replace(/^[\s,.:;]+/g,"").trim():"";
  const direct=!!m&&!titlePart;
- const p=parseNatural(direct?alarmPart:titlePart,nowMs);
+ const appointment=direct?null:parseNatural(titlePart,nowMs);
+ if(m&&!direct&&!appointment){
+  const alert=parseNatural(alarmPart,nowMs);
+  if(!alert||alert.when<=nowMs)return null;
+  return{when:alert.when,alertAt:alert.when,title:titlePart,custom:true};
+ }
+ const p=direct?parseNatural(alarmPart,nowMs):appointment;
  if(!p||p.when<=nowMs)return null;
  let alertAt=p.when,custom=direct;
  if(m&&!direct){
@@ -155,7 +161,7 @@ function completeSpokenAlarm(text){
  const m=marker.exec(text);
  if(!m)return false;
  const alarm=text.slice(m.index+m[0].length).trim();
- return /\b(?:klokken|klokka|kl|om|før|ved avtalen|på slaget|halvtime)\b|\d{1,2}[:.]\d{2}/i.test(alarm);
+ return /\b(?:klokken|klokka|kl|om|før|ved avtalen|på slaget|halvtime|i morgen|i dag)\b|\d{1,2}[:.]\d{2}|\b\d{3,4}\b/i.test(alarm);
 }
 function scheduleDictationSave(){
  clearTimeout(dictationSaveTimer);
