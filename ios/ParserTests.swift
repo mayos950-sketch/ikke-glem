@@ -35,6 +35,8 @@ checkAlert("Legen klokken åtte i morgen, minn meg på det 30 minutter før", 8,
 checkAlert("Legen klokken åtte i morgen, varsle meg klokken sju", 8, 7)
 checkAlert("Legen klokken åtte i morgen, minn meg to timer før", 8, 6)
 checkAlert("Legen klokken åtte i morgen, minn meg ved avtalen", 8, 8)
+checkAlert("Legen klokken åtte i morgen", 8, 8)
+precondition(NorwegianDateParser.parseSpoken("Legen klokken åtte i morgen", now: now, calendar: calendar)?.usedDefault == true)
 checkAlert("Legen klokken åtte i morgen, minn meg en halvtime før", 8, 7, 30)
 checkAlert("Legen klokken åtte i morgen, minn meg 15 minutter før, adresse Storgata 12 Lillestrøm", 8, 7, 45)
 checkAlert("Legen klokken åtte i morgen, adresse Storgata 12 Lillestrøm, minn meg 15 minutter før", 8, 7, 45)

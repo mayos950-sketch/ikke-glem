@@ -37,7 +37,7 @@ enum NorwegianDateParser {
         guard let appointment = parse(main.text, now: now, calendar: calendar), appointment.date > now else { return nil }
         let address = main.address ?? alarmPart?.address
         guard let alarm = alarmPart?.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters)) else {
-            return SpokenReminder(appointment: appointment, alert: max(appointment.date.addingTimeInterval(-3600), now.addingTimeInterval(5)), address: address, usedDefault: true)
+            return SpokenReminder(appointment: appointment, alert: appointment.date, address: address, usedDefault: true)
         }
         let requested: Date
         if alarm == "ved avtalen" || alarm == "på slaget" || alarm == "da" {

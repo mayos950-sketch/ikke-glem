@@ -37,7 +37,7 @@ struct ContentView: View {
             Color.black.opacity(0.16).ignoresSafeArea()
             VStack(spacing: 22) {
                 Text("ikke glem by MP").font(.largeTitle.bold())
-                Text("Ett trykk. Si det. Ferdig. · v1.8").foregroundStyle(.secondary)
+                Text("Ett trykk. Si det. Ferdig. · v1.9").foregroundStyle(.secondary)
                 Button { showCalendars = true } label: { Label("Kalender", systemImage: "calendar.badge.plus") }.disabled(model.busy || model.listening)
                 Button { model.tap() } label: {
                     ZStack {
@@ -241,7 +241,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
                 persist()
                 if let address = spokenReminder.address { resolveAddress(address, id: reminder.id) }
                 status = "Lagret ✓ Varsel \(alert.formatted(date: .abbreviated, time: .shortened))." + calendarResult
-                if spokenReminder.usedDefault { status += " Uten oppgitt varseltid brukes én time før, eller straks hvis den tiden er passert." }
+                if spokenReminder.usedDefault { status += " Uten oppgitt varseltid varsles du ved avtalen." }
             } catch { status = "Kunne ikke lagre varselet: \(error.localizedDescription)" }
         }
     }
