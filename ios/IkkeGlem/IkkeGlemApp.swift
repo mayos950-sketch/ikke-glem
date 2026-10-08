@@ -37,7 +37,7 @@ struct ContentView: View {
             Color.black.opacity(0.16).ignoresSafeArea()
             VStack(spacing: 22) {
                 Text("ikke glem by MP").font(.largeTitle.bold())
-                Text("Ett trykk. Si det. Ferdig. · v1.9").foregroundStyle(.secondary)
+                Text("Ett trykk. Si det. Ferdig.").foregroundStyle(.secondary)
                 Button { showCalendars = true } label: { Label("Kalender", systemImage: "calendar.badge.plus") }.disabled(model.busy || model.listening)
                 Button { model.tap() } label: {
                     ZStack {
@@ -230,7 +230,9 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
             let content = UNMutableNotificationContent()
             content.title = "ikke glem by MP"
             content.body = "\(parsed.title) klokken \(parsed.date.formatted(date: .omitted, time: .shortened))"
-            content.sound = UNNotificationSound(named: UNNotificationSoundName("ikke-glem-fanfare.wav"))
+            content.sound = Bundle.main.url(forResource: "ikke-glem-fanfare", withExtension: "wav") == nil
+                ? .default
+                : UNNotificationSound(named: UNNotificationSoundName("ikke-glem-fanfare.wav"))
             var components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: alert)
             components.timeZone = .current
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
