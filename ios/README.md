@@ -1,6 +1,6 @@
 # ikke glem by MP – native iPhone-App
 
-Einmal auf den grünen Knopf tippen und auf Norwegisch eine Erinnerung sagen. Nach dem finalen Sprachergebnis oder drei Sekunden ohne neue Transkription wird sie gespeichert. Optional kann unter **Hjelp og personvern** Text eingegeben werden.
+Einmal auf den grünen Knopf tippen und in der gewählten Sprache (Norsk, Deutsch oder English) eine Erinnerung sagen. Nach dem finalen Sprachergebnis oder drei Sekunden ohne neue Transkription wird sie gespeichert. Optional kann unter **Hjelp og personvern** Text eingegeben werden.
 
 Beispiele:
 
@@ -15,7 +15,7 @@ Ohne eigene Alarmzeit gilt der Terminzeitpunkt. Die App plant lokale iPhone-Mitt
 
 Das Projekt `ios/IkkeGlem.xcodeproj` in Xcode öffnen, unter **Signing & Capabilities → Team** das eigene Apple-Team wählen. Für die persönliche Geräteinstallation das iPhone auswählen und Run drücken. Für TestFlight/App Store ist eine kostenpflichtige Apple Developer Program-Mitgliedschaft und ein signiertes Archiv nötig.
 
-Die genaue Upload-Anleitung und vorbereiteten Store-Texte stehen in `ios/AppStore/UPLOAD-DE.md` und `ios/AppStore/metadata-nb.md`. Marketing-Version 1.0, Build 4; die Versionsnummer erscheint nicht im App-Bildschirm.
+Die genaue Upload-Anleitung und vorbereiteten Store-Texte stehen in `ios/AppStore/UPLOAD-DE.md` und `ios/AppStore/metadata-nb.md`. Marketing-Version 1.0, Build 5; die Versionsnummer erscheint nicht im App-Bildschirm.
 
 ## Prüfumfang
 
@@ -27,3 +27,7 @@ Die App verwendet ausschließlich Apple-Frameworks und lokale Speicherung. Daten
 
 
 Erkannter Satz und Statusmeldung verschwinden zehn Sekunden nach Ende der Verarbeitung. Neue Eingabe oder Statusänderung startet die Wartezeit neu. Datenschutzwarnung und gespeicherte Erinnerungen bleiben sichtbar.
+
+## Sprachen
+
+Die Auswahl Norsk / Deutsch / English schaltet Bedienung, Statusmeldungen und Spracherkennung um und wird gespeichert. Deutsch verwendet de-DE, Englisch en-GB. Zeitausdrücke wie „Erinnere mich in zehn Minuten“, „Arzt morgen um 18 Uhr, erinnere mich um 17:41“ und „Remind me tomorrow at 2:15 pm“ werden unterstützt. Frei gesprochene Adressen bleiben unverändert. Die Sprachaufnahme muss auf dem echten iPhone in allen drei Sprachen geprüft werden.

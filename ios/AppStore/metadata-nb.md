@@ -12,7 +12,7 @@ Sekundærkategori: Utilities / Verktøy
 
 Versjon: 1.0
 
-Build: 4
+Build: 5
 
 Bundle-ID: com.marioproter.IkkeGlem
 
@@ -22,7 +22,7 @@ SKU (forslag): ikke-glem-mp-ios
 
 Bare si det – så husker vi det for deg.
 
-ikke glem by MP gjør norske hverdagsbeskjeder til påminnelser på iPhone. Trykk på den grønne taleknappen, si hva du vil huske og når du vil bli minnet på det. Etter en kort pause lagres påminnelsen automatisk.
+ikke glem by MP gjør hverdagsbeskjeder på norsk, tysk og engelsk til påminnelser på iPhone. Trykk på den grønne taleknappen, si hva du vil huske og når du vil bli minnet på det. Etter en kort pause lagres påminnelsen automatisk.
 
 Eksempler:
 • «Minn meg om ti minutter.»
@@ -60,7 +60,7 @@ Privacy Policy URL: https://mayos950-sketch.github.io/ikke-glem/privacy.html
 
 Native SwiftUI iPhone reminder app. No login, paid features or backend account required.
 
-Tap the green voice button and allow Microphone, Speech Recognition and Notifications. Speech is Norwegian Bokmål (nb-NO). Try “Minn meg om to minutter”; one reminder is created automatically after the final recognition result or a three-second pause. Close the app and wait two minutes for its local notification.
+Tap the green voice button and allow Microphone, Speech Recognition and Notifications. Choose Norsk (nb-NO), Deutsch (de-DE) or English (en-GB) using the language selector. Try “Minn meg om to minutter” in Norsk, “Erinnere mich in zwei Minuten” in Deutsch, or “Remind me in two minutes” in English; one reminder is created automatically after the final recognition result or a three-second pause. Close the app and wait two minutes for its local notification.
 
 If Norwegian speech recognition is unavailable in the review environment, open “Hjelp og personvern” and enter the same sentence under “Skriv i stedet”, then tap “Lagre påminnelse”. This uses the same parser and local notification path.
 

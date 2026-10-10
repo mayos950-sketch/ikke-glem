@@ -16,7 +16,8 @@ enum NorwegianDateParser {
         let address: String?
         let usedDefault: Bool
     }
-    static func parseSpoken(_ input: String, now: Date = Date(), calendar: Calendar = .current) -> SpokenReminder? {
+    static func parseSpoken(_ input: String, now: Date = Date(), calendar: Calendar = .current, language: String = "nb") -> SpokenReminder? {
+        let input = normalizeLanguage(input, language: language)
         let marker = #"\b(?:minn(?:e)? meg(?: på det)?|minner meg(?: på det)?|varsle meg|påminn meg(?: på det)?)\s+"#
         let regex = try? NSRegularExpression(pattern: marker, options: .caseInsensitive)
         let match = regex?.firstMatch(in: input, range: NSRange(input.startIndex..., in: input))
@@ -80,6 +81,119 @@ enum NorwegianDateParser {
         } else { alert = requested }
         return SpokenReminder(appointment: appointment, alert: alert, address: address, usedDefault: false)
     }
+
+    static func normalizeLanguage(_ input: String, language: String) -> String {
+        guard language == "de" || language == "en" else { return input }
+        // Separate the address so street names are never normalized as clock words.
+        let addressPattern = language == "de" ? #"\b(?:an der adresse|adresse ist|adresse)\s*[:,]?\s+"# : #"\b(?:at the address|address is|address)\s*[:,]?\s+"#
+        var text = input
+        var address = ""
+        if let regex = try? NSRegularExpression(pattern: addressPattern, options: .caseInsensitive),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let range = Range(match.range, in: text) {
+            address = String(text[range.upperBound...])
+            text = String(text[..<range.lowerBound])
+        }
+        func replace(_ pattern: String, _ replacement: String) {
+            text = text.replacingOccurrences(of: pattern, with: replacement, options: [.regularExpression, .caseInsensitive])
+        }
+        let numberWords: [String:Int] = language == "de"
+            ? ["null":0,"ein":1,"eins":1,"eine":1,"einer":1,"einen":1,"zwei":2,"drei":3,"vier":4,"fünf":5,"sechs":6,"sieben":7,"acht":8,"neun":9,"zehn":10,"elf":11,"zwölf":12,"dreizehn":13,"vierzehn":14,"fünfzehn":15,"sechzehn":16,"siebzehn":17,"achtzehn":18,"neunzehn":19,"zwanzig":20,"dreißig":30,"dreissig":30,"vierzig":40,"fünfzig":50,"sechzig":60]
+            : ["zero":0,"a":1,"an":1,"one":1,"two":2,"three":3,"four":4,"five":5,"six":6,"seven":7,"eight":8,"nine":9,"ten":10,"eleven":11,"twelve":12,"thirteen":13,"fourteen":14,"fifteen":15,"sixteen":16,"seventeen":17,"eighteen":18,"nineteen":19,"twenty":20,"thirty":30,"forty":40,"fifty":50,"sixty":60]
+        func number(_ word: String) -> Int? {
+            let w = word.lowercased()
+            if let n = Int(w) ?? numberWords[w] { return n }
+            if language == "de" {
+                for (unit,u) in numberWords where (1...9).contains(u) {
+                    for (ten,t) in numberWords where [20,30,40,50].contains(t) {
+                        if w == unit + "und" + ten { return t + u }
+                    }
+                }
+            } else {
+                let parts = w.split(whereSeparator: { $0 == " " || $0 == "-" }).map(String.init)
+                if parts.count == 2, let t = numberWords[parts[0]], let u = numberWords[parts[1]], [20,30,40,50].contains(t), (1...9).contains(u) { return t + u }
+            }
+            return nil
+        }
+        func convertNumbers(_ pattern: String) {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { return }
+            for match in regex.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
+                guard let range = Range(match.range(at: 1), in: text), let n = number(String(text[range])) else { continue }
+                text.replaceSubrange(range, with: String(n))
+            }
+        }
+        if language == "de" {
+            replace(#"\b(?:erinnere|erinner|erinnern)\s+mich(?:\s+daran)?(?:\s+an)?\b"#, "minn meg")
+            replace(#"\bübermorgen\b"#, "overmorgen")
+            replace(#"\bmorgen\s+früh\b"#, "i morgen tidlig")
+            replace(#"\bheute\s+morgen\b"#, "i dag morges")
+            replace(#"\bmorgen\b"#, "i morgen")
+            // Avoid doubling the day introduced by the previous replacement.
+            replace(#"\bi\s+i morgen\b"#, "i morgen")
+            replace(#"\bheute\b"#, "i dag")
+            replace(#"\b(?:eine|einer|einen)?\s*viertelstunde\b"#, "15 minutter")
+            replace(#"\b(?:eine|einer|einen)?\s*halbe[nr]?\s+stunde\b"#, "30 minutter")
+            replace(#"\bminuten?\b"#, "minutter")
+            replace(#"\bstunden?\b"#, "timer")
+            replace(#"\btage[n]?\b"#, "dager")
+            replace(#"\b(?:vorher|zuvor)\b"#, "før")
+            replace(#"\b(?:abends|abend)\b"#, "kveld")
+            replace(#"\b(?:mittags|mittag)\b"#, "middag")
+            replace(#"\b(?:nachmittags|nachmittag)\b"#, "ettermiddag")
+            replace(#"\bmorgens\b"#, "morges")
+            replace(#"\bum\b"#, "klokken")
+            replace(#"\bin\b(?=\s+(?:\d+|[a-zäöüß-]+)\s+(?:minutter|timer|dager))"#, "om")
+            convertNumbers(#"\b([a-zäöüß-]+|\d+)(?=\s+(?:minutter|timer|dager|uhr)\b)"#)
+            convertNumbers(#"\bklokken\s+([a-zäöüß-]+|\d+)\b"#)
+            convertNumbers(#"\bhal[bv]\s+([a-zäöüß-]+|\d+)\b"#)
+            replace(#"\bhalb\b"#, "halv")
+            replace(#"\b(\d{1,2}(?:[:.]\d{2})?)\s*uhr\b"#, "klokken $1")
+            replace(#"\buhr\b"#, "")
+        } else {
+            replace(#"\bremind\s+me(?:\s+to)?\b"#, "minn meg")
+            replace(#"\bday after tomorrow\b"#, "overmorgen")
+            replace(#"\btomorrow\b"#, "i morgen")
+            replace(#"\btoday\b"#, "i dag")
+            replace(#"\bthis morning\b"#, "i dag morges")
+            replace(#"\btonight\b"#, "i dag kveld")
+            replace(#"\b(?:a |an )?quarter(?: of an)? hour\b"#, "15 minutter")
+            replace(#"\bhalf (?:an |a )?hour\b"#, "30 minutter")
+            replace(#"\bminutes?\b"#, "minutter")
+            replace(#"\bhours?\b"#, "timer")
+            replace(#"\bdays?\b"#, "dager")
+            replace(#"\bbefore\b"#, "før")
+            replace(#"\b(?:morning|early)\b"#, "morges")
+            replace(#"\b(?:noon|midday)\b"#, "middag")
+            replace(#"\bafternoon\b"#, "ettermiddag")
+            replace(#"\bevening\b"#, "kveld")
+            replace(#"\bat\b"#, "klokken")
+            replace(#"\b(?:in|after)\b(?=\s+(?:\d+|[a-z -]+)\s+(?:minutter|timer|dager))"#, "om")
+            convertNumbers(#"\b([a-z]+(?:[- ](?:one|two|three|four|five|six|seven|eight|nine))?|\d+)(?=\s+(?:minutter|timer|dager)\b)"#)
+            convertNumbers(#"\bklokken\s+([a-z]+(?:[- ](?:one|two|three|four|five|six|seven|eight|nine))?|\d+)\b"#)
+            // Also accept “eight thirty” after a clock prefix.
+            convertNumbers(#"\bklokken\s+\d+\s+([a-z]+(?:[- ](?:one|two|three|four|five|six|seven|eight|nine))?)\b"#)
+            convertNumbers(#"\b([a-z]+|\d+)(?=\s+[ap]\.?m\.?\b)"#)
+            let ampm = try! NSRegularExpression(pattern: #"\b(\d{1,2})(?:[:.](\d{2}))?\s*([ap])\.?m\.?\b"#, options: .caseInsensitive)
+            for match in ampm.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
+                guard let range = Range(match.range, in: text), let hr = Range(match.range(at: 1), in: text),
+                      let h = Int(text[hr]), (1...12).contains(h), let mer = Range(match.range(at: 3), in: text) else { continue }
+                let minute = Range(match.range(at: 2), in: text).flatMap { Int(text[$0]) } ?? 0
+                let hour = h % 12 + (text[mer].lowercased() == "p" ? 12 : 0)
+                text.replaceSubrange(range, with: String(format: "klokken %d:%02d", hour, minute))
+            }
+            replace(#"\bklokken\s+klokken\b"#, "klokken")
+        }
+        convertNumbers(#"\b([a-zäöüß-]+)(?=\s*[.!?]?\s*$)"#)
+        replace(#"\bklokken\s+klokken\b"#, "klokken")
+        let pair = try! NSRegularExpression(pattern: #"\bklokken\s+(\d{1,2})\s+(\d{1,2})\b"#)
+        for match in pair.matches(in: text, range: NSRange(text.startIndex..., in: text)).reversed() {
+            guard let range = Range(match.range, in: text), let hr = Range(match.range(at: 1), in: text), let mr = Range(match.range(at: 2), in: text),
+                  let h = Int(text[hr]), let m = Int(text[mr]) else { continue }
+            text.replaceSubrange(range, with: String(format: "klokken %d:%02d", h, m))
+        }
+        return text + (address.isEmpty ? "" : " adresse " + address)
+    }
+
     struct Parsed { let title: String; let date: Date }
     static func parse(_ input: String, now: Date = Date(), calendar: Calendar = .current) -> Parsed? {
         var text = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)

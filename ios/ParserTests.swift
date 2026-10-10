@@ -155,3 +155,39 @@ checkAlert("minn meg 655", 8, 6, 55)
 checkAlert("nøkkel ligger i skapet minner meg om ti minutter", 7, 12, 10)
 print("Three-digit clock and text-first reminder checks passed")
 
+
+
+func checkLanguage(_ input: String, _ language: String, _ day: Int, _ hour: Int, _ minute: Int = 0) {
+    guard let parsed = NorwegianDateParser.parseSpoken(input, now: now, calendar: calendar, language: language) else {
+        fatalError("No \(language) result: \(input) => \(NorwegianDateParser.normalizeLanguage(input, language: language))")
+    }
+    let parts = calendar.dateComponents([.day, .hour, .minute], from: parsed.alert)
+    precondition(parts.day == day && parts.hour == hour && parts.minute == minute,
+        "\(input) => \(NorwegianDateParser.normalizeLanguage(input, language: language)) => \(parts)")
+}
+checkLanguage("Erinnere mich in zehn Minuten", "de", 7, 12, 10)
+checkLanguage("Erinnere mich in einer halben Stunde", "de", 7, 12, 30)
+checkLanguage("Erinnere mich in einer Viertelstunde", "de", 7, 12, 15)
+checkLanguage("Erinnere mich morgen früh", "de", 8, 8)
+checkLanguage("Erinnere mich morgen um acht", "de", 8, 8)
+checkLanguage("Erinnere mich morgen um 14:15 Uhr", "de", 8, 14, 15)
+checkLanguage("Arzt morgen um 18 Uhr, erinnere mich um 17:41", "de", 8, 17, 41)
+checkLanguage("Arzt morgen um acht, erinnere mich dreißig Minuten vorher", "de", 8, 7, 30)
+checkLanguage("Der Schlüssel liegt im Schrank, erinnere mich um 655", "de", 8, 6, 55)
+checkLanguage("Erinnere mich morgen um halb neun", "de", 8, 8, 30)
+checkLanguage("Remind me in ten minutes", "en", 7, 12, 10)
+checkLanguage("Remind me in half an hour", "en", 7, 12, 30)
+checkLanguage("Remind me in a quarter of an hour", "en", 7, 12, 15)
+checkLanguage("Remind me tomorrow morning", "en", 8, 8)
+checkLanguage("Remind me tomorrow at eight", "en", 8, 8)
+checkLanguage("Remind me tomorrow at eight thirty", "en", 8, 8, 30)
+checkLanguage("Remind me tomorrow at 2:15 pm", "en", 8, 14, 15)
+checkLanguage("Remind me tomorrow at 12 am", "en", 8, 0)
+checkLanguage("Doctor tomorrow at 18:00, remind me at 17:41", "en", 8, 17, 41)
+checkLanguage("Doctor tomorrow at eight, remind me thirty minutes before", "en", 8, 7, 30)
+checkLanguage("The key is in the cupboard, remind me at 655", "en", 8, 6, 55)
+precondition(NorwegianDateParser.parseSpoken("Remind me today at 9 am", now: now, calendar: calendar, language: "en") == nil)
+precondition(NorwegianDateParser.parseSpoken("Erinnere mich heute um 9 Uhr", now: now, calendar: calendar, language: "de") == nil)
+let englishAddress = NorwegianDateParser.parseSpoken("Doctor tomorrow at eight, address One Tree Road 12", now: now, calendar: calendar, language: "en")
+precondition(englishAddress?.address == "One Tree Road 12")
+print("German and English reminder checks passed")
