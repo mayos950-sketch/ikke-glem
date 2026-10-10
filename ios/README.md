@@ -9,13 +9,13 @@ Beispiele:
 - „Legen klokken 18 i dag, minn meg klokken 17:41“ → Termin 18:00, Alarm 17:41.
 - „Legen klokken åtte i morgen, minn meg en halvtime før“ → Termin morgen 08:00, Alarm 07:30.
 
-Ohne eigene Alarmzeit gilt der Terminzeitpunkt. Die App plant lokale iPhone-Mitteilungen auch bei geschlossener App. Ton, Fokus und Lautlosmodus folgen den iPhone-Einstellungen. Kein kritischer Systemwecker. Kalenderwahl ist optional; Google-Kalender muss vorher als iPhone-Kalenderkonto eingerichtet sein. Adressen können in Maps geöffnet werden.
+Ohne eigene Alarmzeit gilt der Terminzeitpunkt. Die App plant lokale iPhone-Mitteilungen auch bei geschlossener App. Ton, Fokus und Lautlosmodus folgen den iPhone-Einstellungen. Kein kritischer Systemwecker. Kalendereinträge entstehen nur durch **Legg i kalender** bei der jeweiligen Erinnerung. Die Kalenderwahl legt nur das Ziel fest; Google-Kalender muss vorher als iPhone-Kalenderkonto eingerichtet sein. Adressen können in Maps geöffnet werden.
 
 ## Installation und Veröffentlichung
 
 Das Projekt `ios/IkkeGlem.xcodeproj` in Xcode öffnen, unter **Signing & Capabilities → Team** das eigene Apple-Team wählen. Für die persönliche Geräteinstallation das iPhone auswählen und Run drücken. Für TestFlight/App Store ist eine kostenpflichtige Apple Developer Program-Mitgliedschaft und ein signiertes Archiv nötig.
 
-Die genaue Upload-Anleitung und vorbereiteten Store-Texte stehen in `ios/AppStore/UPLOAD-DE.md` und `ios/AppStore/metadata-nb.md`. Marketing-Version 1.0, Build 2; die Versionsnummer erscheint nicht im App-Bildschirm.
+Die genaue Upload-Anleitung und vorbereiteten Store-Texte stehen in `ios/AppStore/UPLOAD-DE.md` und `ios/AppStore/metadata-nb.md`. Marketing-Version 1.0, Build 3; die Versionsnummer erscheint nicht im App-Bildschirm.
 
 ## Prüfumfang
 

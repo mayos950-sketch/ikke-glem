@@ -9,7 +9,7 @@ with (app / "Info.plist").open("rb") as file:
     info = plistlib.load(file)
 assert info["CFBundleIdentifier"] == "com.marioproter.IkkeGlem"
 assert info["CFBundleShortVersionString"] == "1.0"
-assert info["CFBundleVersion"] == "2"
+assert info["CFBundleVersion"] == "3"
 assert info["ITSAppUsesNonExemptEncryption"] is False
 assert "CFBundleIcons" in info, "Release app icon is missing"
 with (app / "PrivacyInfo.xcprivacy").open("rb") as file:

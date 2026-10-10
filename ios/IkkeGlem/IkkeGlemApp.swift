@@ -27,6 +27,7 @@ struct Reminder: Identifiable, Codable {
 struct ContentView: View {
     @ObservedObject var model: ReminderModel
     @State private var showCalendars = false
+    @State private var pendingCalendarReminder: UUID?
     @State private var showHelp = false
     @State private var writtenReminder = ""
     var body: some View {
@@ -41,7 +42,7 @@ struct ContentView: View {
                 Text("ikke glem by MP").font(.largeTitle.bold())
                 Text("Ett trykk. Si det. Ferdig.").foregroundStyle(.secondary)
                 Button { showHelp = true } label: { Label("Hjelp og personvern", systemImage: "info.circle") }
-                Button { showCalendars = true } label: { Label("Kalender", systemImage: "calendar.badge.plus") }.disabled(model.busy || model.listening)
+                Button { pendingCalendarReminder = nil; showCalendars = true } label: { Label("Kalender", systemImage: "calendar.badge.plus") }.disabled(model.busy || model.listening)
                 Button { model.tap() } label: {
                     ZStack {
                         Image("VoiceButton").resizable().scaledToFit().frame(height: 130)
@@ -62,6 +63,17 @@ struct ContentView: View {
                             Text(reminder.title).font(.headline)
                             Text("Avtale: \(reminder.appointment.formatted(date: .abbreviated, time: .shortened))")
                             Text("Varsel: \(reminder.alert.formatted(date: .abbreviated, time: .shortened))").foregroundStyle(.yellow)
+                            if reminder.calendarEventID == nil {
+                                Button {
+                                    if model.selectedCalendarID.isEmpty {
+                                        pendingCalendarReminder = reminder.id
+                                        showCalendars = true
+                                    } else { model.addToCalendar(reminder.id) }
+                                } label: { Label("Legg i kalender", systemImage: "calendar.badge.plus") }
+                                    .buttonStyle(.borderless).disabled(model.busy || model.listening)
+                            } else {
+                                Label("Lagt i kalender", systemImage: "calendar.badge.checkmark").font(.caption).foregroundStyle(.secondary)
+                            }
                             if let address = reminder.address {
                                 Text(address).font(.subheadline)
                                 Button { model.openMaps(reminder) } label: { Label("Åpne i Maps", systemImage: "map") }.buttonStyle(.borderless)
@@ -81,6 +93,7 @@ struct ContentView: View {
                             Text("Legen klokken 18 i dag, minn meg klokken 17:41 → avtale 18:00, varsel 17:41.")
                             Text("Minn meg om ti minutter → varsel om ti minutter.")
                             Text("Uten egen varseltid kommer varselet ved avtalen. Kontroller alltid tiden som vises etter lagring.")
+                            Text("Påminnelser lagres bare i appen. Trykk «Legg i kalender» på en påminnelse hvis du også vil ha den i kalenderen.")
                         }
                         Section("Skriv i stedet") {
                             TextField("Påminnelse og tidspunkt", text: $writtenReminder, axis: .vertical)
@@ -104,14 +117,15 @@ struct ContentView: View {
                         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Ferdig") { showHelp = false } } }
                 }
             }
-            .sheet(isPresented: $showCalendars) {
+            .sheet(isPresented: $showCalendars, onDismiss: { pendingCalendarReminder = nil }) {
                 NavigationStack {
                     List {
                         Section {
-                            Button("Ikke lagre i kalender") { model.selectCalendar(nil); showCalendars = false }
+                            Button("Ikke lagre i kalender") { model.selectCalendar(nil); pendingCalendarReminder = nil; showCalendars = false }
                             ForEach(model.calendars, id: \.calendarIdentifier) { calendar in
                                 Button {
                                     model.selectCalendar(calendar)
+                                    if let id = pendingCalendarReminder { model.addToCalendar(id) }
                                     showCalendars = false
                                 } label: {
                                     HStack {
@@ -124,11 +138,11 @@ struct ContentView: View {
                                     }
                                 }
                             }
-                        } header: { Text("Velg kalender for automatisk lagring") }
+                        } header: { Text("Velg kalender når du vil legge til en avtale") }
                         Section {
                             Text(model.calendarStatus)
                             Text("Google-kontoen må være lagt til under iPhone-innstillinger → Apper → Kalender → Kalenderkontoer. Velg deretter kalenderen fra Google-kontoen her.")
-                            Text("Avtaler lagres i den valgte kalenderen. Fanfaren kommer fra denne appen.")
+                            Text("Ingen avtaler legges til automatisk. Trykk «Legg i kalender» på de påminnelsene du vil ha der. Fanfaren kommer fra denne appen.")
                         }
                     }.navigationTitle("Kalender")
                         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Ferdig") { showCalendars = false } } }
@@ -151,7 +165,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
     @Published var busy = false
     @Published var calendars: [EKCalendar] = []
     @Published var selectedCalendarID = ""
-    @Published var calendarStatus = "Velg en kalender. Nye avtaler lagres automatisk der."
+    @Published var calendarStatus = "Du velger selv hvilke påminnelser som legges i kalenderen."
     @Published var transcript = ""
     @Published var status = "Si: Legen klokken åtte i morgen, minn meg på det 30 minutter før."
     private let calendarStore = EKEventStore()
@@ -294,7 +308,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
             guard settings.authorizationStatus == .authorized else { status = "Varsler er slått av. Tillat varsler i Innstillinger."; return }
             let alert = spokenReminder.alert
             guard alert > Date() else { status = "Varseltiden har allerede passert. Prøv igjen med en senere tid."; return }
-            var reminder = Reminder(id: UUID(), title: parsed.title, appointment: parsed.date, alert: alert, address: spokenReminder.address)
+            let reminder = Reminder(id: UUID(), title: parsed.title, appointment: parsed.date, alert: alert, address: spokenReminder.address)
             let content = UNMutableNotificationContent()
             content.title = "ikke glem by MP"
             content.body = "\(parsed.title) klokken \(parsed.date.formatted(date: .omitted, time: .shortened))"
@@ -306,11 +320,10 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
             do {
                 try await center.add(UNNotificationRequest(identifier: reminder.id.uuidString, content: content, trigger: trigger))
-                let calendarResult = saveToCalendar(&reminder)
                 reminders.append(reminder)
                 persist()
                 if let address = spokenReminder.address { resolveAddress(address, id: reminder.id) }
-                status = "Lagret ✓ Varsel \(alert.formatted(date: .abbreviated, time: .shortened))." + calendarResult
+                status = "Lagret ✓ Varsel \(alert.formatted(date: .abbreviated, time: .shortened))."
                 if spokenReminder.usedDefault { status += " Uten oppgitt varseltid varsles du ved avtalen." }
             } catch { status = "Kunne ikke lagre varselet: \(error.localizedDescription)" }
         }
@@ -331,14 +344,36 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
                 return
             }
             calendars = calendarStore.calendars(for: .event).filter { $0.allowsContentModifications }.sorted { $0.source.title + $0.title < $1.source.title + $1.title }
-            calendarStatus = calendars.isEmpty ? "Ingen skrivbar kalender er tilgjengelig. Legg til Google-kontoen i iPhone-innstillingene." : "Velg Google-kalenderen under riktig konto. Bare nye avtaler lagres."
+            calendarStatus = calendars.isEmpty ? "Ingen skrivbar kalender er tilgjengelig. Legg til Google-kontoen i iPhone-innstillingene." : "Velg ønsket kalender. Bruk «Legg i kalender» på hver påminnelse."
         } catch { calendars = []; calendarStatus = "Kunne ikke hente kalendere: \(error.localizedDescription)" }
     }
     func selectCalendar(_ calendar: EKCalendar?) {
         selectedCalendarID = calendar?.calendarIdentifier ?? ""
         UserDefaults.standard.set(selectedCalendarID, forKey: calendarKey)
-        calendarStatus = calendar.map { "Lagrer nye avtaler i \($0.title) · \($0.source.title)." } ?? "Automatisk kalenderlagring er slått av."
+        calendarStatus = calendar.map { "Valgt: \($0.title) · \($0.source.title). Du legger til hver avtale selv." } ?? "Ingen kalender er valgt. Påminnelser lagres fortsatt i appen."
     }
+    func addToCalendar(_ id: UUID) {
+        guard !busy && !listening else { return }
+        guard let reminder = reminders.first(where: { $0.id == id }), reminder.calendarEventID == nil else { return }
+        guard !selectedCalendarID.isEmpty else {
+            status = "Velg en kalender først, og trykk «Legg i kalender» på påminnelsen."
+            return
+        }
+        busy = true
+        Task {
+            defer { busy = false }
+            if !calendarAccess { await loadCalendars() }
+            guard calendarAccess else { status = calendarStatus; return }
+            guard let index = reminders.firstIndex(where: { $0.id == id }),
+                  reminders[index].calendarEventID == nil else { return }
+            var reminder = reminders[index]
+            let result = saveToCalendar(&reminder)
+            reminders[index] = reminder
+            persist()
+            status = result.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
     private func saveToCalendar(_ reminder: inout Reminder) -> String {
         guard !selectedCalendarID.isEmpty else { return "" }
         guard calendarAccess, let calendar = calendarStore.calendar(withIdentifier: selectedCalendarID), calendar.allowsContentModifications else {

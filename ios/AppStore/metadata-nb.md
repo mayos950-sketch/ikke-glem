@@ -12,7 +12,7 @@ Sekundærkategori: Utilities / Verktøy
 
 Versjon: 1.0
 
-Build: 2
+Build: 3
 
 Bundle-ID: com.marioproter.IkkeGlem
 
@@ -32,7 +32,7 @@ Eksempler:
 
 Velg selv varseltid. Uten egen varseltid varsler appen ved avtalen. Kontroller alltid teksten og tiden som vises etter lagring.
 
-iPhone planlegger lokale varsler også når appen er lukket. Du kan valgfritt lagre nye avtaler i en kalender på iPhone, inkludert en Google-kalender som er lagt til i telefonens kalenderkontoer. Adresser kan åpnes i Apple Maps.
+iPhone planlegger lokale varsler også når appen er lukket. Trykk «Legg i kalender» på de påminnelsene du selv vil lagre i en kalender på iPhone, inkludert en Google-kalender som er lagt til i telefonens kalenderkontoer. Adresser kan åpnes i Apple Maps.
 
 Hvis du foretrekker å skrive, finnes tekstinnskriving under «Hjelp og personvern».
 
@@ -64,7 +64,7 @@ Tap the green voice button and allow Microphone, Speech Recognition and Notifica
 
 If Norwegian speech recognition is unavailable in the review environment, open “Hjelp og personvern” and enter the same sentence under “Skriv i stedet”, then tap “Lagre påminnelse”. This uses the same parser and local notification path.
 
-Calendar permission is optional and requested only after opening “Kalender”. Choose a writable system calendar to store future events there. No Google sign-in is performed inside the app. The Google account must already be configured in iOS Calendar.
+Calendar permission is optional and requested only after opening “Kalender”. Choose a writable system calendar as the destination. No events are saved automatically. Tap “Legg i kalender” on an individual reminder to save it; the button changes to “Lagt i kalender” after success. No Google sign-in is performed inside the app. The Google account must already be configured in iOS Calendar.
 
 Swipe left on a reminder to delete it and cancel its pending notification. Address lookup uses Apple geocoding and Apple Maps. No GPS access is requested.
 
