@@ -20,10 +20,10 @@ xcrun simctl status_bar "$device_id" override --time "9:41" --batteryState charg
 xcrun simctl install "$device_id" "$app_path"
 xcrun simctl launch "$device_id" com.marioproter.IkkeGlem --screenshots -AppleLanguages '(nb)' -AppleLocale nb_NO
 sleep 5
-xcrun simctl io "$device_id" screenshot release-assets/01-home.png
+xcrun simctl io "$device_id" screenshot --type=jpeg release-assets/01-home.jpg
 xcrun simctl terminate "$device_id" com.marioproter.IkkeGlem
 xcrun simctl launch "$device_id" com.marioproter.IkkeGlem --screenshots --screenshots-help -AppleLanguages '(nb)' -AppleLocale nb_NO
 sleep 5
-xcrun simctl io "$device_id" screenshot release-assets/02-help.png
+xcrun simctl io "$device_id" screenshot --type=jpeg release-assets/02-help.jpg
 xcrun simctl shutdown "$device_id"
 printf 'Screenshots captured from native iPhone simulator. Sample reminders are fictional.\n' > release-assets/screenshot-notes.txt
