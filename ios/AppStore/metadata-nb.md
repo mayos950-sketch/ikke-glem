@@ -34,6 +34,8 @@ Velg selv varseltid. Uten egen varseltid varsler appen ved avtalen. Kontroller a
 
 iPhone planlegger lokale varsler også når appen er lukket. Trykk «Legg i kalender» på de påminnelsene du selv vil lagre i en kalender på iPhone, inkludert en Google-kalender som er lagt til i telefonens kalenderkontoer. Adresser kan åpnes i Apple Maps.
 
+Teksten, meldingene og listen skjules etter ti sekunder. Påminnelsene er fortsatt lagret og vises igjen via «Mine påminnelser».
+
 Hvis du foretrekker å skrive, finnes tekstinnskriving under «Hjelp og personvern».
 
 Ingen brukerkonto, reklame eller sporing. Påminnelser lagres på iPhone. Talegjenkjenning bruker Apples tjenester og kan kreve internett. Kalender og Maps følger kontoene og tjenestene du selv bruker.
@@ -44,7 +46,7 @@ Varsellyd følger innstillingene for lyd, Fokus og varsler på iPhone. Appen er 
 
 ## Kampanjetekst
 
-Ett trykk, en norsk beskjed og en påminnelse når du ønsker. Med lokale varsler, valgfri kalenderlagring og adresser i Maps.
+Ett trykk, en påminnelse når du ønsker. Norsk, tysk og engelsk – med lokale varsler, valgfri kalenderlagring og adresser i Maps.
 
 ## Søkeord
 
@@ -66,6 +68,8 @@ If Norwegian speech recognition is unavailable in the review environment, open �
 
 Calendar permission is optional and requested only after opening “Kalender”. Choose a writable system calendar as the destination. No events are saved automatically. Tap “Legg i kalender” on an individual reminder to save it; the button changes to “Lagt i kalender” after success. No Google sign-in is performed inside the app. The Google account must already be configured in iOS Calendar.
 
+The recognized text, messages and reminder list disappear after ten seconds without deleting saved reminders or cancelling notifications. Tap “Mine påminnelser” to show the list again.
+
 Swipe left on a reminder to delete it and cancel its pending notification. Address lookup uses Apple geocoding and Apple Maps. No GPS access is requested.
 
 Custom notification audio is bundled. iOS notification, silent mode and Focus settings apply. The app does not use Critical Alerts.
@@ -73,3 +77,7 @@ Custom notification audio is bundled. iOS notification, silent mode and Focus se
 ## Noch privat in App Store Connect eintragen
 
 Verkäufer-/Copyrightname, Review-Kontakt mit Telefon und E-Mail, Preis, Verfügbarkeit und DSA-Händlerstatus werden vom Kontoinhaber eingetragen. Keine personenbezogenen Kontaktangaben sind hier vorausgefüllt.
+
+## Skjermbilder og forhåndsvisning
+
+Forhåndsvisningsvideo er valgfri. Last opp 01-home.jpg og 02-help.jpg fra Build 6 (1206 × 2622, JPEG). Skjermbildene viser norsk brukergrensesnitt med språkvalg Norsk/Deutsch/English.
