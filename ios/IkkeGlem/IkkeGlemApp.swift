@@ -24,6 +24,13 @@ struct Reminder: Identifiable, Codable {
     var calendarEventID: String? = nil
 }
 
+struct FeedbackSnapshot: Hashable {
+    let transcript: String
+    let status: String
+    let listening: Bool
+    let busy: Bool
+}
+
 struct ContentView: View {
     @ObservedObject var model: ReminderModel
     @State private var showCalendars = false
@@ -54,9 +61,13 @@ struct ContentView: View {
                 .accessibilityLabel(model.listening ? "Lytter" : "Snakk")
                 Text("Ikke si sensitive opplysninger som passord, kontonummer eller kortnummer.")
                     .font(.footnote).foregroundStyle(.yellow).multilineTextAlignment(.center)
-                Text(model.transcript).font(.title3).accessibilityLabel("Det du sa")
-                Text(model.status).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    .accessibilityAddTraits(.updatesFrequently)
+                if !model.transcript.isEmpty {
+                    Text(model.transcript).font(.title3).accessibilityLabel("Det du sa")
+                }
+                if !model.status.isEmpty {
+                    Text(model.status).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        .accessibilityAddTraits(.updatesFrequently)
+                }
                 List {
                     ForEach(model.reminders.sorted { $0.appointment < $1.appointment }) { reminder in
                         VStack(alignment: .leading, spacing: 6) {
@@ -149,6 +160,14 @@ struct ContentView: View {
                         .task { await model.loadCalendars() }
                 }
             }
+            .task(id: model.feedbackSnapshot) {
+                let snapshot = model.feedbackSnapshot
+                guard !snapshot.listening && !snapshot.busy,
+                      !snapshot.transcript.isEmpty || !snapshot.status.isEmpty else { return }
+                do { try await Task.sleep(nanoseconds: 10_000_000_000) } catch { return }
+                guard !Task.isCancelled, model.feedbackSnapshot == snapshot else { return }
+                model.clearFeedback()
+            }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in model.interrupted() }
             .task {
                 #if DEBUG
@@ -196,6 +215,16 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
             status = "Lagret ✓ Du blir minnet på tidspunktet du sier."
         }
         #endif
+    }
+
+    var feedbackSnapshot: FeedbackSnapshot {
+        FeedbackSnapshot(transcript: transcript, status: status, listening: listening, busy: busy)
+    }
+
+    func clearFeedback() {
+        guard !listening && !busy else { return }
+        transcript = ""
+        status = ""
     }
 
     func saveWritten(_ text: String) {

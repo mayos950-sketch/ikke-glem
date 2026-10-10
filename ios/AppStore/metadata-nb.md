@@ -12,7 +12,7 @@ Sekundærkategori: Utilities / Verktøy
 
 Versjon: 1.0
 
-Build: 3
+Build: 4
 
 Bundle-ID: com.marioproter.IkkeGlem
 

@@ -15,7 +15,7 @@ Ohne eigene Alarmzeit gilt der Terminzeitpunkt. Die App plant lokale iPhone-Mitt
 
 Das Projekt `ios/IkkeGlem.xcodeproj` in Xcode öffnen, unter **Signing & Capabilities → Team** das eigene Apple-Team wählen. Für die persönliche Geräteinstallation das iPhone auswählen und Run drücken. Für TestFlight/App Store ist eine kostenpflichtige Apple Developer Program-Mitgliedschaft und ein signiertes Archiv nötig.
 
-Die genaue Upload-Anleitung und vorbereiteten Store-Texte stehen in `ios/AppStore/UPLOAD-DE.md` und `ios/AppStore/metadata-nb.md`. Marketing-Version 1.0, Build 3; die Versionsnummer erscheint nicht im App-Bildschirm.
+Die genaue Upload-Anleitung und vorbereiteten Store-Texte stehen in `ios/AppStore/UPLOAD-DE.md` und `ios/AppStore/metadata-nb.md`. Marketing-Version 1.0, Build 4; die Versionsnummer erscheint nicht im App-Bildschirm.
 
 ## Prüfumfang
 
@@ -25,3 +25,5 @@ Signierung, Apple Validate App und Sprach-/Benachrichtigungstests auf einem echt
 
 Die App verwendet ausschließlich Apple-Frameworks und lokale Speicherung. Datenschutzinformationen stehen in `privacy.html`, `ios/AppStore/privacy-review.md` und in der App unter **Hjelp og personvern**.
 
+
+Erkannter Satz und Statusmeldung verschwinden zehn Sekunden nach Ende der Verarbeitung. Neue Eingabe oder Statusänderung startet die Wartezeit neu. Datenschutzwarnung und gespeicherte Erinnerungen bleiben sichtbar.
