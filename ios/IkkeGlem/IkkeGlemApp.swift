@@ -46,7 +46,6 @@ struct ContentView: View {
             }.ignoresSafeArea()
             Color.black.opacity(0.16).ignoresSafeArea()
             VStack(spacing: 22) {
-                Text("ikke glem by MP").font(.largeTitle.bold())
                 Text(model.ui("Ett trykk. Si det. Ferdig.")).foregroundStyle(.secondary)
                 Picker(model.ui("Språk"), selection: $model.language) {
                     Text("Norsk").tag("nb")
