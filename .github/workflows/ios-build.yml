@@ -1,4 +1,4 @@
-name: iOS build
+name: iOS release checks
 on:
   push:
     paths: ['ios/**', '.github/workflows/ios-build.yml']
@@ -15,9 +15,30 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check Norwegian date parser
+      - name: Xcode and Norwegian parser checks
         run: |
-          cat ios/IkkeGlem/NorwegianDateParser.swift ios/ParserTests.swift > /tmp/IkkeGlemParserTests.swift
-          swift /tmp/IkkeGlemParserTests.swift
-      - name: Build for iPhone Simulator
-        run: xcodebuild -project ios/IkkeGlem.xcodeproj -target IkkeGlem -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+          xcodebuild -version
+          cat ios/IkkeGlem/NorwegianDateParser.swift ios/ParserTests.swift > "$RUNNER_TEMP/IkkeGlemParserTests.swift"
+          swift "$RUNNER_TEMP/IkkeGlemParserTests.swift"
+      - name: Archive Release for iPhone without signing
+        run: |
+          xcodebuild -project ios/IkkeGlem.xcodeproj -scheme IkkeGlem -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/IkkeGlem.xcarchive" CODE_SIGNING_ALLOWED=NO archive > "$RUNNER_TEMP/release-build.log" 2>&1 || { tail -n 100 "$RUNNER_TEMP/release-build.log"; exit 1; }
+          python3 ios/AppStore/check_release.py "$RUNNER_TEMP/IkkeGlem.xcarchive/Products/Applications/IkkeGlem.app"
+      - name: Build simulator app
+        run: |
+          xcodebuild -project ios/IkkeGlem.xcodeproj -scheme IkkeGlem -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/IkkeGlemDerived" CODE_SIGNING_ALLOWED=NO build > "$RUNNER_TEMP/simulator-build.log" 2>&1 || { tail -n 100 "$RUNNER_TEMP/simulator-build.log"; exit 1; }
+      - name: Capture real app screenshots
+        run: bash ios/AppStore/screenshots.sh "$RUNNER_TEMP/IkkeGlemDerived/Build/Products/Debug-iphonesimulator/IkkeGlem.app"
+      - name: Package source and release report
+        run: |
+          git archive --format=zip --output=release-assets/ikke-glem-appstore-source.zip HEAD ios
+          cp "$RUNNER_TEMP/release-build.log" release-assets/
+          cp "$RUNNER_TEMP/simulator-build.log" release-assets/
+          cp ios/IkkeGlem/Assets.xcassets/AppIcon.appiconset/AppIcon.png release-assets/app-icon-1024.png
+          cp ios/AppStore/*.md release-assets/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ikke-glem-appstore
+          path: release-assets/
+          retention-days: 30
+

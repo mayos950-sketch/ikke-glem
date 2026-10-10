@@ -148,3 +148,10 @@ print("Spoken word clock, today/tomorrow and explicit alarm day checks passed")
 checkAlert("Minn meg 17 i dag", 7, 17)
 checkAlert("Minn meg 18 i morgen", 8, 18)
 checkAlert("Minn meg tjueen i morgen", 8, 21)
+
+checkAlert("nøkkel ligger i skapet minner meg 655", 8, 6, 55)
+precondition(NorwegianDateParser.parseSpoken("nøkkel ligger i skapet minner meg 655", now: now, calendar: calendar)?.appointment.title == "Nøkkel ligger i skapet")
+checkAlert("minn meg 655", 8, 6, 55)
+checkAlert("nøkkel ligger i skapet minner meg om ti minutter", 7, 12, 10)
+print("Three-digit clock and text-first reminder checks passed")
+

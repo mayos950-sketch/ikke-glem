@@ -34,7 +34,15 @@ enum NorwegianDateParser {
         let alarmText = range.map { String(input[$0.upperBound...]) }
         let main = splitAddress(appointmentText)
         let alarmPart = alarmText.map { splitAddress($0) }
-        guard let appointment = parse(main.text, now: now, calendar: calendar), appointment.date > now else { return nil }
+        let parsedAppointment = parse(main.text, now: now, calendar: calendar)
+        if parsedAppointment == nil, let alarmPart,
+           let parsed = parse(alarmPart.text, now: now, calendar: calendar), parsed.date > now {
+            let title = main.text.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+            guard !title.isEmpty else { return nil }
+            let reminder = Parsed(title: title.prefix(1).uppercased() + title.dropFirst(), date: parsed.date)
+            return SpokenReminder(appointment: reminder, alert: parsed.date, address: main.address ?? alarmPart.address, usedDefault: false)
+        }
+        guard let appointment = parsedAppointment, appointment.date > now else { return nil }
         let address = main.address ?? alarmPart?.address
         guard let alarm = alarmPart?.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters)) else {
             return SpokenReminder(appointment: appointment, alert: appointment.date, address: address, usedDefault: true)
@@ -58,7 +66,7 @@ enum NorwegianDateParser {
             } else {
                 requested = appointment.date.addingTimeInterval(-Double(amount) * (unit.hasPrefix("time") ? 3600 : 60))
             }
-        } else if alarm.hasPrefix("klokken") || alarm.hasPrefix("klocken") || alarm.hasPrefix("klokka") || alarm.hasPrefix("kl.") || alarm.range(of: #"\b(?:klokken|klocken|klokka|kl\.?|\d{4}|\d{1,2}[:.]\d{2})\b"#, options: .regularExpression) != nil || alarm.range(of: #"^\d{1,2}\s+\d{2}$"#, options: .regularExpression) != nil {
+        } else if alarm.hasPrefix("klokken") || alarm.hasPrefix("klocken") || alarm.hasPrefix("klokka") || alarm.hasPrefix("kl.") || alarm.range(of: #"\b(?:klokken|klocken|klokka|kl\.?|\d{3,4}|\d{1,2}[:.]\d{2})\b"#, options: .regularExpression) != nil || alarm.range(of: #"^\d{1,2}\s+\d{2}$"#, options: .regularExpression) != nil {
             let hasDay = alarm.range(of: #"\b(?:i\s+dag|idag|i\s+morgen|imorgen|overmorgen)\b"#, options: .regularExpression) != nil
             let expression = "Varsel " + alarm + (hasDay ? "" : " i dag")
             guard let parsed = parse(expression, now: hasDay ? now : appointment.date, calendar: calendar) else { return nil }
@@ -146,7 +154,7 @@ enum NorwegianDateParser {
         var hour: Int?; var minute = 0; var timeFragment = ""
         if let g = match(#"\b(?:(?:klokken|klocken|klokka|kl\.?)\s*)?(\d{1,2})[:.\s](\d{2})\b"#) {
             hour = Int(g[1]); minute = Int(g[2])!; timeFragment = g[0]
-        } else if let g = match(#"\b(?:(?:klokken|klocken|klokka|kl\.?)\s*)?(\d{2})(\d{2})\b"#) {
+        } else if let g = match(#"\b(?:(?:klokken|klocken|klokka|kl\.?)\s*)?(\d{1,2})(\d{2})\b"#) {
             hour = Int(g[1]); minute = Int(g[2])!; timeFragment = g[0]
         } else if let g = match(#"\b(?:(?:klokken|klocken|klokka|kl\.?)\s*)?(en|ett|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|elleve|tolv|tretten|fjorten|femten|seksten|sytten|atten|nitten|tjue|tjueen|tjueto|tjuetre)\s+(null|en|ett|to|tre|fire|fem|seks|sju|syv|åtte|ni|ti|femten|tjue|tjuefem|tretti|førti|førtifem|femti)\b"#), let h = number(g[1]), let m = number(g[2]) {
             hour = h; minute = m; timeFragment = g[0]
@@ -200,3 +208,4 @@ enum NorwegianDateParser {
         return Parsed(title: title(removing: [timeFragment, dayFragment, period]), date: date)
     }
 }
+

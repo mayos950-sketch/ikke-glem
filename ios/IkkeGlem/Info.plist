@@ -41,5 +41,8 @@
 <string>Velg kalenderen din og lagre avtalene du sier automatisk.</string>
 <key>NSCalendarsFullAccessUsageDescription</key>
 <string>Appen trenger tilgang for å vise kalenderne dine, velge Google-kalenderen og lagre eller slette avtaler som appen oppretter.</string>
+<key>ITSAppUsesNonExemptEncryption</key>
+<false/>
 </dict>
 </plist>
+

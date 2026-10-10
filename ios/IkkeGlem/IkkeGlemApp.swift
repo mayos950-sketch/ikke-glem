@@ -27,6 +27,8 @@ struct Reminder: Identifiable, Codable {
 struct ContentView: View {
     @ObservedObject var model: ReminderModel
     @State private var showCalendars = false
+    @State private var showHelp = false
+    @State private var writtenReminder = ""
     var body: some View {
         ZStack {
             GeometryReader { geometry in
@@ -38,6 +40,7 @@ struct ContentView: View {
             VStack(spacing: 22) {
                 Text("ikke glem by MP").font(.largeTitle.bold())
                 Text("Ett trykk. Si det. Ferdig.").foregroundStyle(.secondary)
+                Button { showHelp = true } label: { Label("Hjelp og personvern", systemImage: "info.circle") }
                 Button { showCalendars = true } label: { Label("Kalender", systemImage: "calendar.badge.plus") }.disabled(model.busy || model.listening)
                 Button { model.tap() } label: {
                     ZStack {
@@ -48,6 +51,8 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent).tint(.green)
                 .disabled(model.busy || model.listening)
                 .accessibilityLabel(model.listening ? "Lytter" : "Snakk")
+                Text("Ikke si sensitive opplysninger som passord, kontonummer eller kortnummer.")
+                    .font(.footnote).foregroundStyle(.yellow).multilineTextAlignment(.center)
                 Text(model.transcript).font(.title3).accessibilityLabel("Det du sa")
                 Text(model.status).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     .accessibilityAddTraits(.updatesFrequently)
@@ -67,6 +72,38 @@ struct ContentView: View {
                 }.scrollContentBackground(.hidden).listStyle(.plain)
             }.padding()
         }.preferredColorScheme(.dark)
+            .sheet(isPresented: $showHelp) {
+                NavigationStack {
+                    Form {
+                        Section("Slik bruker du appen") {
+                            Text("Trykk på den grønne knappen og si en påminnelse på norsk. Den lagres etter en kort pause.")
+                            Text("Nøkkel ligger i skapet, minner meg 655 → neste klokken 06:55.")
+                            Text("Legen klokken 18 i dag, minn meg klokken 17:41 → avtale 18:00, varsel 17:41.")
+                            Text("Minn meg om ti minutter → varsel om ti minutter.")
+                            Text("Uten egen varseltid kommer varselet ved avtalen. Kontroller alltid tiden som vises etter lagring.")
+                        }
+                        Section("Skriv i stedet") {
+                            TextField("Påminnelse og tidspunkt", text: $writtenReminder, axis: .vertical)
+                                .autocorrectionDisabled()
+                            Button("Lagre påminnelse") { model.saveWritten(writtenReminder); writtenReminder = ""; showHelp = false }
+                                .disabled(writtenReminder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.busy || model.listening)
+                        }
+                        Section("Varsler") {
+                            Text("iPhone planlegger lokale varsler også når appen er lukket. Lyd følger iPhone-innstillingene for lyd, Fokus og varsler. Dette er ikke en kritisk alarm.")
+                            Button("Åpne iPhone-innstillinger") {
+                                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                            }
+                        }
+                        Section("Personvern") {
+                            Text("Påminnelser lagres på iPhone. Appen lagrer ikke lydopptak og har ingen reklame eller sporing. Apples talegjenkjenning kan behandle lyd på Apples servere hvis lokal talegjenkjenning ikke er tilgjengelig.")
+                            Text("Ikke si sensitive opplysninger som passord, kontonummer eller kortnummer.")
+                            Link("Personvernerklæring", destination: URL(string: "https://mayos950-sketch.github.io/ikke-glem/privacy.html")!)
+                            Link("Brukerstøtte", destination: URL(string: "https://mayos950-sketch.github.io/ikke-glem/support.html")!)
+                        }
+                    }.navigationTitle("Hjelp og personvern")
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Ferdig") { showHelp = false } } }
+                }
+            }
             .sheet(isPresented: $showCalendars) {
                 NavigationStack {
                     List {
@@ -99,6 +136,11 @@ struct ContentView: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in model.interrupted() }
+            .task {
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--screenshots-help") { showHelp = true }
+                #endif
+            }
     }
 }
 
@@ -129,6 +171,31 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
            let saved = try? JSONDecoder().decode([Reminder].self, from: data) { reminders = saved }
         selectedCalendarID = UserDefaults.standard.string(forKey: calendarKey) ?? ""
         UNUserNotificationCenter.current().delegate = self
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--screenshots") {
+            let calendar = Calendar.current
+            let morning = calendar.date(bySettingHour: 8, minute: 0, second: 0, of: calendar.date(byAdding: .day, value: 1, to: Date())!)!
+            reminders = [
+                Reminder(id: UUID(), title: "Legen", appointment: morning, alert: morning.addingTimeInterval(-1800)),
+                Reminder(id: UUID(), title: "Nøkkel ligger i skapet", appointment: morning.addingTimeInterval(-3900), alert: morning.addingTimeInterval(-3900))
+            ]
+            status = "Lagret ✓ Du blir minnet på tidspunktet du sier."
+        }
+        #endif
+    }
+
+    func saveWritten(_ text: String) {
+        guard !busy && !listening else { return }
+        busy = true
+        Task {
+            do {
+                let allowed = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+                guard allowed else { busy = false; status = "Tillat varsler i iPhone-innstillingene."; return }
+                transcript = text
+                busy = false
+                finish()
+            } catch { busy = false; status = "Kunne ikke be om varsler: \(error.localizedDescription)" }
+        }
     }
 
     func tap() {
@@ -170,6 +237,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
         let bufferRequest = SFSpeechAudioBufferRecognitionRequest()
         bufferRequest.shouldReportPartialResults = true
         bufferRequest.taskHint = .dictation
+        bufferRequest.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
         request = bufferRequest
         let node = engine.inputNode
         let format = node.outputFormat(forBus: 0)
@@ -190,7 +258,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
                     if final { self.finish() }
                     else {
                         self.silence = Task { [weak self] in
-                            do { try await Task.sleep(nanoseconds: 1_800_000_000) } catch { return }
+                            do { try await Task.sleep(nanoseconds: 3_000_000_000) } catch { return }
                             guard let self, self.sessionID == id else { return }
                             self.finish()
                         }
@@ -347,4 +415,5 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
     private func persist() { if let data = try? JSONEncoder().encode(reminders) { UserDefaults.standard.set(data, forKey: storage) } }
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions { [.banner, .sound, .list] }
 }
+
 

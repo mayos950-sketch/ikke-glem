@@ -1,30 +1,27 @@
-# Ikke glem – native iPhone-App
+# ikke glem by MP – native iPhone-App
 
-Einmal **Snakk** tippen und z. B. „Legen klokken åtte i morgen“ sagen. Nach einer kurzen Sprechpause wird der Termin automatisch gespeichert. Du kannst die Zeit mitsprechen: „minn meg 30 minutter før“ oder „varsle meg klokken sju“. Das iPhone plant die lokale Mitteilung zum gewünschten Zeitpunkt, ohne Kalender-Import und ohne laufende App. Beim ersten Start sind Freigaben für Mikrofon, Spracherkennung und Mitteilungen erforderlich.
+Einmal auf den grünen Knopf tippen und auf Norwegisch eine Erinnerung sagen. Nach dem finalen Sprachergebnis oder drei Sekunden ohne neue Transkription wird sie gespeichert. Optional kann unter **Hjelp og personvern** Text eingegeben werden.
 
-## Auf dem iMac installieren
+Beispiele:
 
-1. Dieses Repository als ZIP herunterladen und entpacken.
-2. `ios/IkkeGlem.xcodeproj` in Xcode öffnen.
-3. Das Ziel **IkkeGlem** → **Signing & Capabilities** öffnen und unter **Team** deine Apple-ID auswählen. Bei Bedarf eine eigene eindeutige Bundle-ID eintragen.
-4. iPhone per Kabel verbinden, entsperren und dem Mac vertrauen. Falls Xcode darum bittet, den Entwicklermodus auf dem iPhone aktivieren.
-5. Oben das iPhone als Ziel wählen und **▶ Run** drücken.
-6. Beim ersten Tippen auf **Snakk** Mikrofon, Spracherkennung und Mitteilungen erlauben.
+- „Minn meg om ti minutter“ → Alarm in zehn Minuten.
+- „Nøkkel ligger i skapet, minner meg 655“ → nächstes 06:55 mit dem Text „Nøkkel ligger i skapet“.
+- „Legen klokken 18 i dag, minn meg klokken 17:41“ → Termin 18:00, Alarm 17:41.
+- „Legen klokken åtte i morgen, minn meg en halvtime før“ → Termin morgen 08:00, Alarm 07:30.
 
-Eine persönliche Installation braucht keine Veröffentlichung im App Store. Eine kostenlose Apple-ID erfordert regelmäßiges erneutes Signieren; die App ist hier noch nicht signiert. Vorhandene Erinnerungen aus der Webseite werden nicht automatisch übernommen.
+Ohne eigene Alarmzeit gilt der Terminzeitpunkt. Die App plant lokale iPhone-Mitteilungen auch bei geschlossener App. Ton, Fokus und Lautlosmodus folgen den iPhone-Einstellungen. Kein kritischer Systemwecker. Kalenderwahl ist optional; Google-Kalender muss vorher als iPhone-Kalenderkonto eingerichtet sein. Adressen können in Maps geöffnet werden.
 
-## Verhalten
+## Installation und Veröffentlichung
 
-- Sprache: Norwegisch Bokmål (`nb-NO`). Je nach Gerät kann Internet nötig sein.
-- Beispiele: „Legen klokken 8“, „Legen klokken åtte i morgen“, „Ring Petra halv ni i morgen“, „Kjøp melk om 30 minutter“.
-- Ohne Datum wird das nächste Vorkommen der Uhrzeit verwendet; „i dag“ mit vergangener Uhrzeit wird abgelehnt.
-- Die gewünschte Varseltid wird mitgesprochen: „minn meg på det 30 minutter før“, „minn meg to timer før“, „varsle meg klokken sju“ oder „minn meg ved avtalen“. Unklare oder vergangene ausdrücklich genannte Zeiten werden abgelehnt. Ohne Angabe bleibt eine Stunde vorher der Standard; ist diese Zeit vorbei, wird in fünf Sekunden erinnert.
-- Ende der Aufnahme: finales Sprachergebnis oder 1,8 Sekunden ohne neue Transkription. Bei längeren Sprechpausen kann ein Satz zu früh abgeschlossen werden. Die erkannte Aussage und gespeicherte Zeit werden angezeigt.
-- Zum Löschen einen Listeneintrag nach links wischen. Sein geplanter Alarm wird entfernt.
-- iOS-Fokus, lautloser Modus und die Mitteilungseinstellungen bestimmen, ob eine Mitteilung hörbar ist; dies ist kein kritischer Systemwecker.
+Das Projekt `ios/IkkeGlem.xcodeproj` in Xcode öffnen, unter **Signing & Capabilities → Team** das eigene Apple-Team wählen. Für die persönliche Geräteinstallation das iPhone auswählen und Run drücken. Für TestFlight/App Store ist eine kostenpflichtige Apple Developer Program-Mitgliedschaft und ein signiertes Archiv nötig.
 
-## Prüfung
+Die genaue Upload-Anleitung und vorbereiteten Store-Texte stehen in `ios/AppStore/UPLOAD-DE.md` und `ios/AppStore/metadata-nb.md`. Marketing-Version 1.0, Build 2; die Versionsnummer erscheint nicht im App-Bildschirm.
 
-Die Projektstruktur und Berechtigungsangaben wurden geprüft. In der Erstellungsumgebung steht kein Xcode zur Verfügung; ein iOS-Build und ein Test auf dem echten iPhone stehen aus. Der Workflow `.github/workflows/ios-build.yml` baut ohne Signierung für den Simulator und prüft den Datumsparser.
+## Prüfumfang
 
-Test auf dem iPhone: Einmal „Legen klokken åtte i morgen“ sagen → ein Listeneintrag, Termin 08:00, Alarm 07:00. Für einen schnellen Test „Test om to minutter“ sagen und die App schließen: eine Mitteilung sollte nach etwa fünf Sekunden erscheinen. Danach den Testeintrag löschen.
+GitHub Actions führt die norwegischen Parserprüfungen aus, erstellt ein unsigniertes Release-Archiv und einen Simulator-Build. Das Release-Archiv wird auf App-Icon, Datenschutzmanifest, Info.plist und Fanfare geprüft. Zwei echte Simulator-Screenshots mit fiktiven Beispieldaten und ein ZIP des iPhone-Projekts werden im Artefakt **ikke-glem-appstore** bereitgestellt.
+
+Signierung, Apple Validate App und Sprach-/Benachrichtigungstests auf einem echten iPhone erfolgen vor der Einreichung. Simulator-Screenshots beweisen keine funktionierende Sprachaufnahme oder Zustellung auf einem echten Gerät.
+
+Die App verwendet ausschließlich Apple-Frameworks und lokale Speicherung. Datenschutzinformationen stehen in `privacy.html`, `ios/AppStore/privacy-review.md` und in der App unter **Hjelp og personvern**.
+
