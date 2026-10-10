@@ -37,7 +37,6 @@ textarea{min-height:92px}.dictation-field{display:none;margin-bottom:10px}.dicta
 <div class="small">Varsel med lukket app krever at du legger påminnelsen i Kalender via knappen nedenfor.</div>
 </div>
 
-<div id="alarmNotice" class="card" role="alert" hidden></div>
 <div class="card"><h2>Mine påminnelser</h2><div id="list"></div></div>
 
 </div>
@@ -206,13 +205,13 @@ function downloadCalendar(r){
 }
 function calendarById(id){const r=reminders.find(x=>x.id===id);if(r)downloadCalendar(r)}
 function render(){const b=$("list"),s=[...reminders].sort((a,b)=>a.when-b.when);if(!s.length){b.innerHTML='<div class="empty">Ingen påminnelser ennå.</div>';return}b.innerHTML=s.map(r=>`<div class="item"><div class="item-title">${esc(r.text)}</div><div class="item-time">Avtale: ${fmt(r.when)} • Alarm: ${fmt(r.alertAt??r.when)}</div><div class="item-actions"><button onclick="calendarById('${r.id}')">📅 Kalender</button><button onclick="done('${r.id}')">✅ Ferdig</button><button onclick="del('${r.id}')">🗑️ Slett</button></div></div>`).join("")}
-function done(id){const r=reminders.find(x=>x.id===id);if(r){r.done=true;persist();render();showAlarmNotice()}}
-function del(id){reminders=reminders.filter(x=>x.id!==id);persist();render();showAlarmNotice()}
-let alarmAudio=null, soundBusy=false;
+function done(id){const r=reminders.find(x=>x.id===id);if(r){r.done=true;persist();render()}}
+function del(id){reminders=reminders.filter(x=>x.id!==id);persist();render()}
+let alarmAudio=null;
 function unlockSound(){
  try{
-  if(!alarmAudio||alarmAudio.state==="closed")alarmAudio=new (window.AudioContext||window.webkitAudioContext)();
-  if(alarmAudio.state!=="running")alarmAudio.resume().catch(()=>{});
+  if(!alarmAudio)alarmAudio=new (window.AudioContext||window.webkitAudioContext)();
+  if(alarmAudio.state==="suspended")alarmAudio.resume().catch(()=>{});
   const source=alarmAudio.createOscillator(),gain=alarmAudio.createGain();
   gain.gain.value=0;source.connect(gain);gain.connect(alarmAudio.destination);
   source.start();source.stop(alarmAudio.currentTime+.01);
@@ -221,67 +220,30 @@ function unlockSound(){
 async function playFanfare(){
  try{
   unlockSound();
-  if(!alarmAudio)return false;
-  const context=alarmAudio;
-  if(context.state!=="running"){
-   await Promise.race([context.resume(),new Promise(resolve=>setTimeout(resolve,750))]);
-  }
-  if(context.state!=="running"||document.visibilityState!=="visible")return false;
+  if(!alarmAudio)return;
+  if(alarmAudio.state==="suspended")await alarmAudio.resume();
+  if(alarmAudio.state!=="running")return;
   const notes=[523.25,659.25,783.99,1046.5,783.99,1046.5];
-  const start=context.currentTime+.03;
-  return await new Promise(resolve=>{
-   let settled=false;const sources=[];
-   const finish=success=>{if(settled)return;settled=true;clearTimeout(timeout);for(const node of sources){try{node.stop();node.disconnect()}catch(e){}}resolve(success)};
-   const timeout=setTimeout(()=>finish(false),3000);
-   try{
-    notes.forEach((frequency,i)=>{
-     const oscillator=context.createOscillator(),gain=context.createGain();
-     const t=start+i*.21;
-     oscillator.type="triangle";oscillator.frequency.value=frequency;
-     gain.gain.setValueAtTime(.0001,t);
-     gain.gain.exponentialRampToValueAtTime(.23,t+.035);
-     gain.gain.exponentialRampToValueAtTime(.0001,t+.19);
-     oscillator.connect(gain);gain.connect(context.destination);sources.push(oscillator);
-     if(i===notes.length-1)oscillator.onended=()=>finish(context.state==="running"&&document.visibilityState==="visible");
-     oscillator.start(t);oscillator.stop(t+.2);
-    });
-   }catch(e){finish(false)}
+  const start=alarmAudio.currentTime+.03;
+  notes.forEach((frequency,i)=>{
+   const oscillator=alarmAudio.createOscillator(),gain=alarmAudio.createGain();
+   const t=start+i*.21;
+   oscillator.type="triangle";oscillator.frequency.value=frequency;
+   gain.gain.setValueAtTime(.0001,t);
+   gain.gain.exponentialRampToValueAtTime(.23,t+.035);
+   gain.gain.exponentialRampToValueAtTime(.0001,t+.19);
+   oscillator.connect(gain);gain.connect(alarmAudio.destination);
+   oscillator.start(t);oscillator.stop(t+.2);
   });
- }catch(e){return false}
+ }catch(e){}
 }
-function pendingSounds(){return reminders.filter(r=>!r.done&&r.soundPending)}
-function showAlarmNotice(){
- const box=$("alarmNotice"),pending=pendingSounds();
- if(!pending.length){box.hidden=true;box.innerHTML="";return}
- box.hidden=false;
- box.innerHTML='<strong>Ikke glem!</strong><p>'+pending.map(r=>esc(r.text)).join("<br>")+'</p><div class="small">Hvis Safari har stoppet lyden, trykk her for å spille alarmen. Med låst skjerm eller lukket app må du bruke Kalender.</div><button class="btn gold" onclick="retryAlarmSound()">🔔 Spill alarm</button>';
-}
-async function retryAlarmSound(){
- unlockSound();
- if(soundBusy||document.visibilityState!=="visible")return;
- const pending=pendingSounds();if(!pending.length)return;
- soundBusy=true;
- try{
-  const played=await playFanfare();
-  if(played){
-   for(const r of pending)r.soundPending=false;
-   persist();
-   $("status").textContent="Ikke glem! "+pending.map(r=>r.text).join(" • ");
-  }else $("status").textContent="Safari stoppet alarmlyden. Trykk på «Spill alarm».";
- }finally{soundBusy=false;showAlarmNotice()}
-}
-function fire(r){r.fired=true;r.soundPending=true;persist();showAlarmNotice()}
-function checkDue(){
- if(document.visibilityState!=="visible")return;
- const n=Date.now();let fired=false;
- reminders.forEach(r=>{if(!r.done&&!r.fired&&(r.alertAt??r.when)<=n){fire(r);fired=true}});
- if(fired)retryAlarmSound();
-}
-function schedule(){if(timer)clearInterval(timer);timer=setInterval(checkDue,1000)}
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){unlockSound();checkDue();retryAlarmSound()}});
-document.addEventListener("pointerdown",()=>{unlockSound();retryAlarmSound()});
+function fire(r){r.fired=true;persist();playFanfare();setTimeout(()=>alert("Ikke glem!\n\n"+r.text),1450)}
+function checkDue(){if(document.visibilityState!=="visible")return;const n=Date.now();reminders.forEach(r=>{if(!r.done&&!r.fired&&(r.alertAt??r.when)<=n)fire(r)})}
+function schedule(){if(timer)clearInterval(timer);timer=setInterval(checkDue,5000)}
+document.addEventListener("visibilitychange",checkDue);
+document.addEventListener("pointerdown",unlockSound,{once:true});
 $("text").addEventListener("input",()=>{unlockSound();preview();scheduleDictationSave()});
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
-render();schedule();showAlarmNotice();checkDue();
+render();schedule();
 </script>
 </body></html>
