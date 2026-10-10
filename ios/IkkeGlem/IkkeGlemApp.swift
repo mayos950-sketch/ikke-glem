@@ -29,6 +29,8 @@ struct FeedbackSnapshot: Hashable {
     let status: String
     let listening: Bool
     let busy: Bool
+    let reminderListVisible: Bool
+    let presentationRevision: Int
 }
 
 struct ContentView: View {
@@ -72,6 +74,10 @@ struct ContentView: View {
                     Text(model.ui(model.status)).foregroundStyle(.secondary).multilineTextAlignment(.center)
                         .accessibilityAddTraits(.updatesFrequently)
                 }
+                Button { model.showReminders() } label: {
+                    Label(model.ui("Mine påminnelser"), systemImage: "list.bullet")
+                }.disabled(model.busy || model.listening)
+                if model.reminderListVisible {
                 List {
                     ForEach(model.reminders.sorted { $0.appointment < $1.appointment }) { reminder in
                         VStack(alignment: .leading, spacing: 6) {
@@ -97,6 +103,7 @@ struct ContentView: View {
                         .swipeActions { Button(model.ui("Slett"), role: .destructive) { model.remove(reminder) } }
                     }
                 }.scrollContentBackground(.hidden).listStyle(.plain)
+                } else { Spacer(minLength: 0) }
             }.padding()
         }.preferredColorScheme(.dark)
             .environment(\.locale, model.displayLocale)
@@ -168,7 +175,7 @@ struct ContentView: View {
             .task(id: model.feedbackSnapshot) {
                 let snapshot = model.feedbackSnapshot
                 guard !snapshot.listening && !snapshot.busy,
-                      !snapshot.transcript.isEmpty || !snapshot.status.isEmpty else { return }
+                      !snapshot.transcript.isEmpty || !snapshot.status.isEmpty || snapshot.reminderListVisible else { return }
                 do { try await Task.sleep(nanoseconds: 10_000_000_000) } catch { return }
                 guard !Task.isCancelled, model.feedbackSnapshot == snapshot else { return }
                 model.clearFeedback()
@@ -197,6 +204,8 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
         date.formatted(.dateTime.locale(displayLocale).hour().minute())
     }
 
+    @Published var reminderListVisible = true
+    @Published private var presentationRevision = 0
     @Published var reminders: [Reminder] = []
     @Published var listening = false
     @Published var busy = false
@@ -236,13 +245,19 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
     }
 
     var feedbackSnapshot: FeedbackSnapshot {
-        FeedbackSnapshot(transcript: transcript, status: status, listening: listening, busy: busy)
+        FeedbackSnapshot(transcript: transcript, status: status, listening: listening, busy: busy, reminderListVisible: reminderListVisible, presentationRevision: presentationRevision)
+    }
+
+    func showReminders() {
+        reminderListVisible = true
+        presentationRevision += 1
     }
 
     func clearFeedback() {
         guard !listening && !busy else { return }
         transcript = ""
         status = ""
+        reminderListVisible = false
     }
 
     func saveWritten(_ text: String) {
@@ -368,6 +383,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
             do {
                 try await center.add(UNNotificationRequest(identifier: reminder.id.uuidString, content: content, trigger: trigger))
                 reminders.append(reminder)
+                reminderListVisible = true
                 persist()
                 if let address = spokenReminder.address { resolveAddress(address, id: reminder.id) }
                 status = "Lagret ✓ Varsel \(dateText(alert))."
@@ -502,6 +518,7 @@ final class ReminderModel: NSObject, ObservableObject, UNUserNotificationCenterD
 
 enum AppLanguage {
     static let labels: [String: [String]] = [
+        "Mine påminnelser": ["Meine Erinnerungen", "My reminders"],
         "Språk": ["Sprache", "Language"],
         "klokken": ["um", "at"],
         "Lagt til av ikke glem by MP.": ["Hinzugefügt von ikke glem by MP.", "Added by ikke glem by MP."],
