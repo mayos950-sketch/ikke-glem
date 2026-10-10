@@ -37,6 +37,7 @@ textarea{min-height:92px}.dictation-field{display:none;margin-bottom:10px}.dicta
 <div class="small">Varsel med lukket app krever at du legger påminnelsen i Kalender via knappen nedenfor.</div>
 </div>
 
+<div class="card" id="calendarPanel" hidden></div>
 <div class="card"><h2>Mine påminnelser</h2><div id="list"></div></div>
 
 </div>
@@ -193,17 +194,44 @@ function startSpeech(){
 }
 function icsEscape(value){return String(value).replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
 function icsDate(date){return date.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"")}
-function downloadCalendar(r){
+function calendarContent(r){
  const start=new Date(r.when), end=new Date(r.when+15*60000);
  const lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Ikke glem//NO","CALSCALE:GREGORIAN","METHOD:PUBLISH","BEGIN:VEVENT",
   "UID:"+r.id+"@ikke-glem","DTSTAMP:"+icsDate(new Date()),"DTSTART:"+icsDate(start),"DTEND:"+icsDate(end),
   "SUMMARY:"+icsEscape(r.text),"DESCRIPTION:Påminnelse fra Ikke glem","BEGIN:VALARM","TRIGGER;VALUE=DATE-TIME:"+icsDate(new Date(r.alertAt??r.when)),"ACTION:DISPLAY","DESCRIPTION:"+icsEscape(r.text),"END:VALARM","END:VEVENT","END:VCALENDAR"];
- const blob=new Blob([lines.join("\r\n")+"\r\n"],{type:"text/calendar;charset=utf-8"});
- const url=URL.createObjectURL(blob), a=document.createElement("a");
- a.href=url;a.download="ikke-glem-"+new Date(r.when).toISOString().slice(0,10)+".ics";document.body.appendChild(a);a.click();a.remove();
- setTimeout(()=>URL.revokeObjectURL(url),60000);
+ return lines.join("\r\n")+"\r\n";
 }
-function calendarById(id){const r=reminders.find(x=>x.id===id);if(r)downloadCalendar(r)}
+let calendarURL=null;
+function closeCalendar(){
+ $("calendarPanel").hidden=true;
+ if(calendarURL){URL.revokeObjectURL(calendarURL);calendarURL=null}
+}
+function calendarById(id){
+ const r=reminders.find(x=>x.id===id);if(!r)return;
+ closeCalendar();
+ const fileName="ikke-glem-"+new Date(r.when).toISOString().slice(0,10)+".ics";
+ calendarURL=URL.createObjectURL(new Blob([calendarContent(r)],{type:"text/calendar;charset=utf-8"}));
+ const google=new URL("https://calendar.google.com/calendar/render");
+ google.search=new URLSearchParams({action:"TEMPLATE",text:r.text,dates:icsDate(new Date(r.when))+"/"+icsDate(new Date(r.when+15*60000)),details:"Ønsket alarm: "+fmt(r.alertAt??r.when)+". Still inn varselet før du lagrer."}).toString();
+ const panel=$("calendarPanel");
+ panel.hidden=false;
+ panel.innerHTML='<h2>Legg i kalender</h2><p>'+esc(r.text)+'</p><p class="item-time">Avtale: '+fmt(r.when)+'<br>Ønsket alarm: '+fmt(r.alertAt??r.when)+'</p><button class="btn" id="shareCalendar">Del kalenderfil</button><a class="btn" style="display:block;text-align:center;text-decoration:none" href="'+esc(calendarURL)+'" download="'+fileName+'">Last ned kalenderfil (.ics)</a><p class="small">På iPhone: Hvis filen ikke åpner Kalender, bruk «Del kalenderfil» og åpne vedlegget i Apple Mail. Kontroller tidspunkt og varsel, og trykk Legg til. Nedlasting alene oppretter ingen avtale.</p><a class="btn" style="display:block;text-align:center;text-decoration:none" href="'+esc(google.href)+'" target="_blank" rel="noopener noreferrer">Åpne Google Kalender</a><p class="small">Google Kalender åpner et forslag med avtaletiden. Still inn ønsket varsel selv og trykk Lagre. Tittel og tidspunkt deles med Google når du åpner lenken.</p><div id="calendarStatus" class="status" role="status"></div><button class="btn" onclick="closeCalendar()">Lukk</button>';
+ $("shareCalendar").onclick=()=>shareCalendar(r);
+ panel.scrollIntoView({behavior:"smooth",block:"start"});
+ $("status").textContent="Velg hvordan du vil legge til avtalen. Den er ikke lagt i kalenderen ennå.";
+}
+async function shareCalendar(r){
+ try{
+  const file=new File([calendarContent(r)],"ikke-glem.ics",{type:"text/calendar"});
+  if(!navigator.share||!navigator.canShare||!navigator.canShare({files:[file]})){
+   $("calendarStatus").textContent="Denne nettleseren kan ikke dele kalenderfiler. Bruk Last ned eller Google Kalender.";return;
+  }
+  await navigator.share({files:[file]});
+  $("calendarStatus").textContent="Kalenderfilen er delt. Kontroller at avtalen og alarmen er lagt til i kalenderen.";
+ }catch(e){
+  $("calendarStatus").textContent=e.name==="AbortError"?"Deling avbrutt. Ingen kalenderavtale er bekreftet.":"Deling mislyktes. Prøv Last ned eller Google Kalender.";
+ }
+}
 function render(){const b=$("list"),s=[...reminders].sort((a,b)=>a.when-b.when);if(!s.length){b.innerHTML='<div class="empty">Ingen påminnelser ennå.</div>';return}b.innerHTML=s.map(r=>`<div class="item"><div class="item-title">${esc(r.text)}</div><div class="item-time">Avtale: ${fmt(r.when)} • Alarm: ${fmt(r.alertAt??r.when)}</div><div class="item-actions"><button onclick="calendarById('${r.id}')">📅 Kalender</button><button onclick="done('${r.id}')">✅ Ferdig</button><button onclick="del('${r.id}')">🗑️ Slett</button></div></div>`).join("")}
 function done(id){const r=reminders.find(x=>x.id===id);if(r){r.done=true;persist();render()}}
 function del(id){reminders=reminders.filter(x=>x.id!==id);persist();render()}
