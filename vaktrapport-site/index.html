@@ -342,9 +342,6 @@ async function createHandoverPDF(r){
  draw('Vaktansvarlig: '+(r.name||'Ikke angitt'));
  draw('Vaktperiode: '+(r.from||'?')+' kl. '+(r.start||'–')+' til '+(r.to||'?')+' kl. '+(r.end||'–'));
  draw('');
- draw('ARBEIDSTIMER PER PERSON',true);
- for(const person of hoursEntries(r))draw(person.name+' ('+person.role+'): '+(hoursNumber(person.raw)===null?'Ikke registrert':hoursNumber(person.raw)+' timer'));
- draw('');
  const open=openIncidents(r);
  draw('ÅPNE HENDELSER ('+open.length+')',true);
  if(!open.length)draw('Ingen åpne hendelser er registrert i denne rapporten.');
