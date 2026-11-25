@@ -28,6 +28,20 @@
 #addincident.add-incident-btn:hover{background:#c7e276;border-color:#7fa33f}
 #addincident.add-incident-btn:active{background:#b7d866;box-shadow:none}
 #addincident.add-incident-btn:focus-visible{outline:3px solid #245b4d;outline-offset:3px}
+#finish-review-dialog{border:1px solid #9db6a2;border-radius:14px;max-width:min(620px,94vw);max-height:88vh;overflow:auto;padding:25px;color:var(--ink);box-shadow:0 16px 55px #0004}
+#finish-review-dialog::backdrop{background:rgba(15,35,27,.55)}
+#finish-review-dialog ol{padding-left:24px;max-height:50vh;overflow:auto}
+#finish-review-dialog li{margin:0 0 15px;padding:0 0 10px;border-bottom:1px solid var(--line)}
+#finish-review-dialog li span{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+#finish-review-dialog li p{margin:5px 0 0;white-space:pre-wrap}
+.incident-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.incident-tools .btn{display:inline-flex;cursor:pointer}
+.incident-photo-upload{padding-top:12px;border-top:1px solid var(--line)}
+.incident-photo-list{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.incident-photo{position:relative;max-width:160px}
+.incident-photo img{width:155px;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.incident-photo .btn{margin-top:5px}
+@media(max-width:720px){.incident-tools .btn{flex:1 1 130px}.incident-photo img{width:130px;height:100px}}
 </style></head><body><div class="shell"><aside><div class="brand"><div class="mark" aria-hidden="true">≋</div><div>Lillestrøm<small>KOMMUNE · UTEDRIFT</small></div></div><div class="section-label">VANN OG AVLØP</div><nav aria-label="Hovedmeny"><button data-view="home" class="active"><span>▦</span>Oversikt</button><button data-view="new"><span>＋</span>Ny vaktrapport</button><button data-view="reports"><span>▤</span>Rapportarkiv</button></nav><footer><div><span class="dot"></span>Rapporter lagres lokalt på denne enheten</div><div>Utedrift · Vann og avløp</div></footer></aside><main><header><div class="breadcrumb">Utedrift <span style="padding:0 10px">/</span> <b>Vaktrapport</b></div><div class="date" id="today"></div></header><div class="content" id="page"></div></main></div><div id="printout"></div><div id="toast" class="toast hidden" role="status"></div>
 <script>!function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"function"==typeof define&&define.amd?define(["exports"],e):e((t=t||self).PDFLib={})}(this,(function(t){"use strict";
 /*! *****************************************************************************
@@ -63,6 +77,134 @@ $('#today').textContent=new Date().toLocaleDateString('nb-NO',{weekday:'long',da
 function toast(t){$('#toast').textContent=t;$('#toast').classList.remove('hidden');clearTimeout(saveTimer);saveTimer=setTimeout(()=>$('#toast').classList.add('hidden'),4500)}
 let storageBlocked=false;
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(reports));storageBlocked=false;return true}catch(e){storageBlocked=true;toast('Kan ikke lagre på denne enheten. Bruk nettversjonen i Safari, eller last ned en JSON-sikkerhetskopi.');return false}}
+function openPhotoDB(){
+ return new Promise((resolve,reject)=>{
+  if(!('indexedDB' in window)){reject(new Error('Bildelagring er ikke tilgjengelig i denne nettleseren.'));return;}
+  const request=indexedDB.open('lillestrom-vaktrapport-bilder-v1',1);
+  request.onupgradeneeded=()=>{
+   const db=request.result;
+   const store=db.createObjectStore('photos',{keyPath:'id'});
+   store.createIndex('byReport','reportId',{unique:false});
+   store.createIndex('byIncident','reportIncident',{unique:false});
+  };
+  request.onsuccess=()=>resolve(request.result);
+  request.onerror=()=>reject(request.error||new Error('Kunne ikke åpne bildelagring'));
+ });
+}
+async function photoReadBy(indexName,value){
+ const db=await openPhotoDB();
+ return new Promise((resolve,reject)=>{
+  const t=db.transaction('photos','readonly'),request=t.objectStore('photos').index(indexName).getAll(value);
+  request.onsuccess=()=>resolve(request.result||[]);
+  request.onerror=()=>reject(request.error);
+  t.oncomplete=()=>db.close();t.onabort=()=>db.close();
+ });
+}
+function photosForReport(reportId){return photoReadBy('byReport',reportId)}
+function photosForIncident(reportId,incidentId){return photoReadBy('byIncident',reportId+'|'+incidentId)}
+async function storePhotoRecord(photo){
+ const db=await openPhotoDB();
+ return new Promise((resolve,reject)=>{
+  const t=db.transaction('photos','readwrite');t.objectStore('photos').put(photo);
+  t.oncomplete=()=>{db.close();resolve()};t.onerror=()=>{db.close();reject(t.error||new Error('Bildet kunne ikke lagres'))};
+  t.onabort=()=>{db.close();reject(t.error||new Error('Bildelagring avbrutt'))};
+ });
+}
+async function removePhotoRecord(id){
+ const db=await openPhotoDB();
+ return new Promise((resolve,reject)=>{
+  const t=db.transaction('photos','readwrite');t.objectStore('photos').delete(id);
+  t.oncomplete=()=>{db.close();resolve()};t.onerror=()=>{db.close();reject(t.error||new Error('Bildet kunne ikke fjernes'))};
+  t.onabort=()=>{db.close();reject(t.error||new Error('Bildesletting avbrutt'))};
+ });
+}
+async function makePhotoData(file){
+ if(!file||!file.type.startsWith('image/'))throw new Error('Velg et bilde (JPG, PNG eller HEIC).');
+ if(file.size>20e6)throw new Error('Bildet er for stort. Velg et bilde under 20 MB.');
+ return new Promise((resolve,reject)=>{
+  const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{
+   try{
+    const ratio=Math.min(1,1200/Math.max(img.naturalWidth,img.naturalHeight));
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(img.naturalWidth*ratio));
+    canvas.height=Math.max(1,Math.round(img.naturalHeight*ratio));
+    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+    const dataUrl=canvas.toDataURL('image/jpeg',.75);
+    if(!dataUrl.startsWith('data:image/jpeg;base64,'))throw new Error('Bildet kunne ikke konverteres.');
+    resolve(dataUrl);
+   }catch(e){reject(e)}finally{URL.revokeObjectURL(url)}
+  };
+  img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Telefonen kunne ikke lese bildet. Prøv et annet bilde.'))};
+  img.src=url;
+ });
+}
+async function displayIncidentPhotos(){
+ const container=$('#incident-photo-list'),r=current;
+ if(!container||!r||!r.incidents[incidentPage])return;
+ const x=r.incidents[incidentPage];
+ try{
+  const pictures=await photosForIncident(r.id,x.id);
+  if(!container.isConnected||current?.id!==r.id||current.incidents[incidentPage]?.id!==x.id)return;
+  container.innerHTML=pictures.length?pictures.map(p=>`<div class="incident-photo"><img src="${p.dataUrl}" alt="${esc(p.filename||'Foto fra hendelse')}" loading="lazy"><button type="button" class="btn danger small" data-photo-delete="${esc(p.id)}" aria-label="Fjern bilde">Fjern</button></div>`).join(''):'<span class="muted" style="font-size:12px">Ingen bilder lagt til ennå.</span>';
+  container.querySelectorAll('[data-photo-delete]').forEach(b=>b.onclick=async()=>{
+   if(!confirm('Fjerne dette bildet fra hendelsen?'))return;
+   try{await removePhotoRecord(b.dataset.photoDelete);await displayIncidentPhotos()}catch(e){toast('Kunne ikke fjerne bildet: '+e.message)}
+  });
+ }catch(e){container.textContent='Bilder kunne ikke lastes: '+e.message}
+}
+async function attachIncidentPhoto(file,index){
+ if(!current||!current.incidents[index])return;
+ const reportId=current.id,incidentId=current.incidents[index].id;
+ try{
+  const existing=await photosForIncident(reportId,incidentId);
+  if(existing.length>=3)throw new Error('Maks 3 bilder per hendelse. Fjern et bilde for å legge til et nytt.');
+  const dataUrl=await makePhotoData(file);
+  const photoId=uid();
+  await storePhotoRecord({id:reportId+'|'+incidentId+'|'+photoId,reportId,incidentId,reportIncident:reportId+'|'+incidentId,photoId,filename:file.name||'Bilde',dataUrl,createdAt:now()});
+  await displayIncidentPhotos();
+  toast('Bildet er lagret på denne enheten. Husk «Lagre på telefon» for sikkerhetskopi med bilder.');
+ }catch(e){toast('Kunne ikke lagre bilde: '+e.message)}
+}
+function mapForIncident(x){
+ const coords=Number.isFinite(Number(x.lat))&&Number.isFinite(Number(x.lng))&&x.lat!==undefined&&x.lng!==undefined&&x.lat!==''&&x.lng!==''?x.lat+','+x.lng:'';
+ const query=coords||(x.place||'').trim();
+ if(!query){toast('Fyll inn adresse eller bruk GPS først.');return}
+ window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(query),'_blank','noopener,noreferrer');
+}
+function useIncidentGPS(index){
+ if(!navigator.geolocation){toast('GPS er ikke tilgjengelig i denne nettleseren.');return}
+ const r=current,x=r?.incidents[index],status=$('#geo-status');
+ if(!x)return;
+ if(status)status.textContent='Henter posisjon …';
+ navigator.geolocation.getCurrentPosition(pos=>{
+  if(current?.id!==r.id||!current.incidents.some(y=>y.id===x.id))return;
+  x.lat=pos.coords.latitude.toFixed(6);x.lng=pos.coords.longitude.toFixed(6);
+  storeCurrent(false);
+  const label=$('#geo-status');if(label)label.textContent='GPS lagret: '+x.lat+', '+x.lng;
+ },e=>{const label=$('#geo-status');if(label)label.textContent=e.code===1?'GPS ble ikke tillatt. Du kan fortsatt skrive inn adresse.':'Kunne ikke hente posisjon. Skriv inn adressen i stedet.'},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+}
+function showFinishReview(){
+ if(!current)return;
+ const r=current;
+ const prev=document.querySelector('#finish-review-dialog');if(prev)prev.remove();
+ const modal=document.createElement('dialog');modal.id='finish-review-dialog';
+ const entries=r.incidents.map((x,i)=>`<li><strong>Hendelse ${i+1}: ${esc(x.place||'Ukjent sted')}</strong><span>${esc(x.date||'')} kl. ${esc(x.time||'–')} · ${esc(x.type||'Annet')}</span><p>${esc((x.description||'').slice(0,180))}</p></li>`).join('');
+ const unchecked=r.checks.filter(v=>!v).length;
+ modal.innerHTML=`<h2>Kontroller før ferdigstilling</h2><p><strong>${esc(r.name||'Vaktrapport')}</strong> · ${esc(r.from)} – ${esc(r.to)}</p><p>${r.incidents.length} hendelser registrert. ${unchecked?'Husk: '+unchecked+' punkter i overleveringssjekken er ikke merket.':'Alle punkter i overleveringssjekken er merket.'}</p><ol>${entries||'<li>Ingen hendelser registrert.</li>'}</ol><div class="actions"><button class="btn light" type="button" id="cancel-finish">Tilbake og rediger</button><button class="btn" type="button" id="confirm-finish">✓ Ferdigstill rapport</button></div>`;
+ document.body.append(modal);
+ const close=()=>{modal.close?.();modal.remove()};
+ modal.querySelector('#cancel-finish').onclick=close;
+ modal.querySelector('#confirm-finish').onclick=()=>{
+  current.status='done';
+  if(storeCurrent(true)){close();toast('Vaktrapporten er ferdigstilt.');current=null;render('reports')}
+  else{current.status='draft';toast('Lagring blokkert. Lagre en rapportfil på telefonen.');close()}
+ };
+ modal.addEventListener('close',()=>modal.remove(),{once:true});
+ if(typeof modal.showModal==='function')modal.showModal();
+ else if(confirm('Ferdigstille rapport med '+r.incidents.length+' hendelser?'))modal.querySelector('#confirm-finish').click();
+ else close();
+}
 function blank(){return {id:uid(),name:'',colleague:'',colleague2:'',colleague3:'',colleague4:'',colleague5:'',extravakt:'',extraFrom:'',extraTo:'',extraShifts:[],from:today(),to:(()=>{const d=new Date();d.setDate(d.getDate()+1);return new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,10)})(),start:'15:00',end:'07:00',shift:'Beredskapsvakt',summary:'',handover:'',checks:[false,false,false,false],incidents:[],status:'draft',updated:now()}}
 const checkLabels=['Alarmer og driftsmeldinger er gjennomgått','Utstyr og kjøretøy er kontrollert','Åpne hendelser er beskrevet for neste vakt','Overlevering er gjennomført'];
 function row(r){return `<div class="reportrow"><div><h3>${esc(r.name||'Utkast uten navn')}</h3><p>${fmt(r.from)} – ${fmt(r.to)} · ${r.incidents.length} hendelser</p></div><div class="rowtools"><span class="status ${r.status==='draft'?'draft':''}">${r.status==='draft'?'Utkast':'Ferdigstilt'}</span><button class="btn light small" data-open="${r.id}">Åpne →</button></div></div>`}
@@ -79,16 +221,16 @@ function extraHTML(x,i){return `<article class="incident"><div class="incidenthe
 function extraError(r){for(const [i,x] of extraShifts(r).entries()){if(!x.name.trim()&&!x.from&&!x.to)continue;if(!x.name.trim())return 'Fyll inn navn på ekstravakt '+(i+1)+'.';if(!x.from||!x.to)return 'Fyll inn både fra- og tildato for ekstravakt '+(i+1)+'.';if(x.to<x.from)return 'Tildato kan ikke være før fradato for ekstravakt '+(i+1)+'.';}return ''}
 function incidentPager(r){const total=r.incidents.length;if(!total)return '';return `<div class="incident-pager" role="group" aria-label="Bla mellom hendelser"><button type="button" class="btn light small" data-incident-step="-1" ${incidentPage===0?'disabled':''}>← Forrige</button><label class="incident-page-select">Hendelse <select aria-label="Velg hendelse" data-incident-pick>${r.incidents.map((x,i)=>`<option value="${i}" ${i===incidentPage?'selected':''}>${i+1} av ${total}</option>`).join('')}</select></label><button type="button" class="btn light small" data-incident-step="1" ${incidentPage===total-1?'disabled':''}>Neste →</button></div>`}
 function renderForm(){if(!current)current=blank();if(!Array.isArray(current.extraShifts))current.extraShifts=extraShifts(current);if(incidentPageReportId!==current.id){incidentPageReportId=current.id;incidentPage=0;}incidentPage=Math.max(0,Math.min(incidentPage,current.incidents.length-1));const r=current;$('#page').innerHTML=`<div class="topline"><div><div class="eyebrow">${r.status==='done'?'Ferdigstilt rapport':'Vaktlogg'}</div><h1>${reports.some(x=>x.id===r.id)?'Vaktrapport':'Ny vaktrapport'}</h1><p class="muted">Fyll inn vaktperioden og det som har skjedd.</p></div><button class="btn light small" id="back">← Oversikt</button></div><form id="reportform"><div class="form-layout"><div><section class="panel formcard"><h2>01 <span class="muted" style="margin-left:10px">Vaktinformasjon</span></h2><div class="fields">${input('Vaktansvarlig','name','text',true)}<div class="field full"><span>Medvakt · opptil 5 personer</span></div>${input('Medvakt 1','colleague')}${input('Medvakt 2','colleague2')}${input('Medvakt 3','colleague3')}${input('Medvakt 4','colleague4')}${input('Medvakt 5 (valgfritt)','colleague5')}${input('Fra dato','from','date',true)}${input('Til dato','to','date',true)}${input('Starttid','start','time',true)}${input('Sluttid','end','time',true)}<fieldset class="field full" style="border:1px solid var(--line,#dce3dc);border-radius:12px;padding:18px;margin:8px 0"><legend>Ekstravakter · egne perioder</legend><p class="muted" style="margin:0 0 14px">Legg til hver person med egen fra- og tildato. For én dag velger du samme dato i begge feltene. Samme person kan legges til flere ganger for separate perioder.</p>${r.extraShifts.map(extraHTML).join('')}<button type="button" class="btn light small" id="addextra">＋ Legg til ekstravakt</button></fieldset><label class="field full">Vakttype<select name="shift">${['Beredskapsvakt','Dagvakt','Kveldsvakt','Nattevakt','Helgevakt'].map(v=>`<option ${r.shift===v?'selected':''}>${v}</option>`).join('')}</select></label><label class="field full">Oppsummering av vakten<textarea name="summary" placeholder="Kort om driftssituasjonen, alarmer og viktige observasjoner …">${esc(r.summary)}</textarea></label></div></section><section class="panel formcard"><div class="panelhead" style="padding:0 0 20px;margin-bottom:20px"><h2 style="margin:0">02 <span class="muted" style="margin-left:10px">Hendelser (${r.incidents.length})</span></h2><button class="btn small add-incident-btn" type="button" id="addincident">＋ Legg til hendelse</button></div><div id="incident-pages">${incidentPager(r)}<div id="incidents">${r.incidents.length?incidentHTML(r.incidents[incidentPage],incidentPage):'<p class="muted" style="font-size:13px">Ingen hendelser registrert. En rolig vakt kan også ferdigstilles.</p>'}</div>${incidentPager(r)}</div></section><section class="panel formcard"><h2>03 <span class="muted" style="margin-left:10px">Overlevering</span></h2><label class="field">Til neste vakt<textarea name="handover" placeholder="Utestående arbeid, oppfølging og viktige beskjeder …">${esc(r.handover)}</textarea></label><div class="checks" style="margin-top:24px">${checkLabels.map((t,i)=>`<label><input type="checkbox" data-check="${i}" ${r.checks[i]?'checked':''}>${t}</label>`).join('')}</div></section><div class="report-save-actions"><button class="btn report-save-main" id="save" type="button">✓ Lagre utkast</button><button class="btn light report-finish" type="submit">${r.status==='done'?'Lagre ferdigstilt rapport':'Ferdigstill rapport →'}</button></div><p class="report-save-hint">Lagre utkast hvis du vil fortsette senere. Velg «Ferdigstill rapport» først når alt er klart.</p><div class="actions report-phone-actions"><button class="btn light" id="savephone" type="button">📱 Lagre på telefon</button><button class="btn light" id="openphone" type="button">📂 Åpne lagret rapport</button><input id="phonefile" type="file" accept="application/json,.json" class="hidden"></div><p class="report-save-hint">Telefonkopien lagres som en egen fil i Nedlastinger/Filer. Den kan åpnes igjen senere, også etter en oppdatering.</p><div class="actions report-other-actions"><button class="btn light" id="quickbackup" type="button">Sikkerhetskopi av alle rapporter (JSON)</button><button class="btn light" id="print" type="button">Skriv ut</button><button class="btn light" id="pdfpreview" type="button">Åpne PDF / del</button><button class="btn light" id="email" type="button">Del PDF</button><button class="btn light small" id="emailtext" type="button">Last ned PDF</button>${reports.some(x=>x.id===r.id)?'<button class="btn danger small" type="button" id="delete">Slett</button>':''}</div><p class="muted" style="font-size:13px">«Skriv ut» klargjør en PDF for utskrift på telefon og åpner utskriftsdialogen på PC. På telefon velger du «Del / skriv ut» eller «Åpne PDF for utskrift». Alle hendelser blir med. Rapportene ligger i «Rapportarkiv». </p><div id="pdfmailfallback" role="status"></div><p id="formerror" class="error" role="alert"></p><p class="savedtime" id="savedtime"></p></div><aside class="info" style="position:static;height:auto;color:var(--ink);display:block"><div class="eyebrow">Vaktens huskeliste</div><h2 style="margin-top:12px">En tydelig rapport<br>gjør en forskjell.</h2><p>Registrer tidspunkt, sted og hva som ble gjort. Oppgi hva neste vakt må følge opp.</p><small>Felter med * må fylles ut ved ferdigstilling. Utkast lagres automatisk når du skriver.</small><div class="data-note">Lokal lagring · Unngå fødselsnummer og andre sensitive personopplysninger. Dette er et arbeidsutkast uten kommunal systemintegrasjon.</div></aside></div></form>`;
-$('#reportform').oninput=e=>{const el=e.target;if(el.dataset.check!==undefined)current.checks[+el.dataset.check]=el.checked;else if(el.dataset.extraKey){current.extraShifts[+el.dataset.extraIndex][el.dataset.extraKey]=el.value}else if(el.dataset.ikey){current.incidents[+el.dataset.index][el.dataset.ikey]=el.value}else if(el.name)current[el.name]=el.value;clearPreparedPDF();storeCurrent(false)};
-$('#addextra').onclick=()=>{current.extraShifts.push({name:'',from:'',to:''});storeCurrent(false);renderForm()};document.querySelectorAll('[data-remove-extra]').forEach(b=>b.onclick=()=>{current.extraShifts.splice(+b.dataset.removeExtra,1);storeCurrent(false);renderForm()});
-$('#reportform').onsubmit=e=>{e.preventDefault();if(validate()){current.status='done';if(storeCurrent(true)){toast('Vaktrapporten er ferdigstilt.');current=null;render('reports')}else{offerJSONBackup('Rapporten er ferdig, men nettleseren blokkerer lagring. Last ned rapportfilen for å beholde den.')}}};$('#save').onclick=()=>{current.status='draft';if(storeCurrent(true)){toast('Utkastet er lagret.');current=null;render('reports')}else{offerJSONBackup('Lagring er blokkert i denne visningen. Bruk «Lagre rapportfil (JSON)» og åpne filen senere fra Rapportarkiv.')}};$('#savephone').onclick=()=>saveReportToPhone(current);
+displayIncidentPhotos();const activeIncident=current.incidents[incidentPage];if(activeIncident?.lat&&activeIncident?.lng&&$('#geo-status'))$('#geo-status').textContent='GPS lagret: '+activeIncident.lat+', '+activeIncident.lng;$('#reportform').oninput=e=>{const el=e.target;if(el.dataset.check!==undefined)current.checks[+el.dataset.check]=el.checked;else if(el.dataset.extraKey){current.extraShifts[+el.dataset.extraIndex][el.dataset.extraKey]=el.value}else if(el.dataset.ikey){current.incidents[+el.dataset.index][el.dataset.ikey]=el.value}else if(el.name)current[el.name]=el.value;clearPreparedPDF();storeCurrent(false)};
+document.querySelectorAll('[data-photo-input]').forEach(el=>el.onchange=e=>{const file=e.target.files?.[0];e.target.value='';if(file)attachIncidentPhoto(file,incidentPage)});if($('#incident-gps'))$('#incident-gps').onclick=()=>useIncidentGPS(incidentPage);if($('#incident-map'))$('#incident-map').onclick=()=>mapForIncident(current.incidents[incidentPage]);$('#addextra').onclick=()=>{current.extraShifts.push({name:'',from:'',to:''});storeCurrent(false);renderForm()};document.querySelectorAll('[data-remove-extra]').forEach(b=>b.onclick=()=>{current.extraShifts.splice(+b.dataset.removeExtra,1);storeCurrent(false);renderForm()});
+$('#reportform').onsubmit=e=>{e.preventDefault();if(validate())showFinishReview()};$('#save').onclick=()=>{current.status='draft';if(storeCurrent(true)){toast('Utkastet er lagret.');current=null;render('reports')}else{offerJSONBackup('Lagring er blokkert i denne visningen. Bruk «Lagre rapportfil (JSON)» og åpne filen senere fra Rapportarkiv.')}};$('#savephone').onclick=()=>saveReportToPhone(current);
 $('#openphone').onclick=()=>$('#phonefile').click();
 $('#phonefile').onchange=importReports;
-$('#quickbackup').onclick=()=>{storeCurrent(false);download(JSON.stringify(reports,null,2),'vaktrapporter-sikkerhetskopi-'+uniqueFilePart()+'.json','application/json')};$('#email').onclick=()=>startPDFAction('share');$('#emailtext').onclick=()=>startPDFAction('download');$('#print').onclick=()=>{if(!current)return;storeCurrent(false);const snapshot=structuredClone(current);const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);if(mobile){sendReportPDF(snapshot,'print');return;}try{printReport(snapshot)}catch(e){console.error('Utskrift feilet',e);sendReportPDF(snapshot,'print')}};$('#pdfpreview').onclick=()=>startPDFAction('preview');$('#back').onclick=()=>{if(storeCurrent(false)){current=null;render('home')}else{offerJSONBackup('Lagring er blokkert. Lagre en rapportfil (JSON) før du går tilbake.')}};$('#addincident').onclick=()=>{current.incidents.push({id:uid(),date:current.from,time:'',endtime:'',place:'',phone:'',attendees:'',area:'Vann',type:'Annet',priority:'Normal',status:'Avsluttet',description:'',measures:'',followup:''});incidentPage=current.incidents.length-1;storeCurrent(false);renderForm();document.querySelector('#incident-pages')?.scrollIntoView({behavior:'smooth',block:'start'})};if($('#delete'))$('#delete').onclick=()=>{if(confirm('Vil du slette denne vaktrapporten?')){reports=reports.filter(x=>x.id!==current.id);if(persist()){current=null;render('reports');toast('Rapporten er slettet.')}}};const goToIncidentPage=(index)=>{if(!Number.isInteger(index)||index<0||index>=current.incidents.length)return;storeCurrent(false);incidentPage=index;renderForm();document.querySelector('#incident-pages')?.scrollIntoView({behavior:'auto',block:'start'});};document.querySelectorAll('[data-incident-step]').forEach(b=>b.onclick=()=>goToIncidentPage(incidentPage+Number(b.dataset.incidentStep)));document.querySelectorAll('[data-incident-pick]').forEach(s=>s.onchange=()=>goToIncidentPage(Number(s.value)));document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{if(confirm('Slette hendelsen?')){current.incidents.splice(+b.dataset.remove,1);storeCurrent(false);renderForm()}})}
+$('#quickbackup').onclick=()=>{storeCurrent(false);download(JSON.stringify(reports,null,2),'vaktrapporter-sikkerhetskopi-'+uniqueFilePart()+'.json','application/json')};$('#email').onclick=()=>startPDFAction('share');$('#emailtext').onclick=()=>startPDFAction('download');$('#print').onclick=()=>{if(!current)return;storeCurrent(false);const snapshot=structuredClone(current);const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);if(mobile){sendReportPDF(snapshot,'print');return;}try{printReport(snapshot)}catch(e){console.error('Utskrift feilet',e);sendReportPDF(snapshot,'print')}};$('#pdfpreview').onclick=()=>startPDFAction('preview');$('#back').onclick=()=>{if(storeCurrent(false)){current=null;render('home')}else{offerJSONBackup('Lagring er blokkert. Lagre en rapportfil (JSON) før du går tilbake.')}};$('#addincident').onclick=()=>{current.incidents.push({id:uid(),date:today(),time:new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit',hour12:false}),endtime:'',place:'',phone:'',attendees:'',area:'Vann',type:'Annet',priority:'Normal',status:'Avsluttet',description:'',measures:'',followup:''});incidentPage=current.incidents.length-1;storeCurrent(false);renderForm();document.querySelector('#incident-pages')?.scrollIntoView({behavior:'smooth',block:'start'})};if($('#delete'))$('#delete').onclick=()=>{if(confirm('Vil du slette denne vaktrapporten?')){reports=reports.filter(x=>x.id!==current.id);if(persist()){current=null;render('reports');toast('Rapporten er slettet.')}}};const goToIncidentPage=(index)=>{if(!Number.isInteger(index)||index<0||index>=current.incidents.length)return;storeCurrent(false);incidentPage=index;renderForm();document.querySelector('#incident-pages')?.scrollIntoView({behavior:'auto',block:'start'});};document.querySelectorAll('[data-incident-step]').forEach(b=>b.onclick=()=>goToIncidentPage(incidentPage+Number(b.dataset.incidentStep)));document.querySelectorAll('[data-incident-pick]').forEach(s=>s.onchange=()=>goToIncidentPage(Number(s.value)));document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{if(confirm('Slette hendelsen?')){current.incidents.splice(+b.dataset.remove,1);storeCurrent(false);renderForm()}})}
 function offerJSONBackup(message){const el=$('#formerror');if(el)el.textContent=message;toast(message);}
 function startPDFAction(mode){if(!current)return;storeCurrent(false);const snapshot=structuredClone(current);sendReportPDF(snapshot,mode)}
 function clearPreparedPDF(){const p=$('#pdfmailfallback');if(p)p.innerHTML='';if(preparedMailPDF){URL.revokeObjectURL(preparedMailPDF.url);preparedMailPDF=null;}}
-function incidentHTML(x,i){const field=(t,k,type='text')=>`<label class="field">${t}<input type="${type}" data-index="${i}" data-ikey="${k}" value="${esc(x[k]??'')}"></label>`;const select=(t,k,opts)=>`<label class="field">${t}<select data-index="${i}" data-ikey="${k}">${opts.map(v=>`<option ${x[k]===v?'selected':''}>${v}</option>`).join('')}</select></label>`;const area=(t,k,p)=>`<label class="field full">${t}<textarea data-index="${i}" data-ikey="${k}" placeholder="${p}">${esc(x[k])}</textarea></label>`;return `<article class="incident"><div class="incidenthead"><h3>Hendelse ${i+1}</h3><button class="btn danger small" type="button" data-remove="${i}">Fjern</button></div><div class="fields">${field('Dato','date','date')}${field('Sted / adresse / anlegg','place')}${field('Hvem var på stedet? (valgfritt)','attendees')}${field('Telefonnummer for spørsmål (valgfritt)','phone','tel')}${field('Mottatt kl.','time','time')}${field('Avsluttet kl.','endtime','time')}${select('Fagområde','area',['Vann','Avløp','Overvann','Annet'])}${select('Hendelsestype','type',['Annet','Vannlekkasje','Lavt vanntrykk / vannstans','Tett avløp','Pumpestasjon / alarm','Oversvømmelse','Driftskontroll'])}${select('Prioritet','priority',['Normal','Høy','Akutt'])}${select('Status','status',['Avsluttet','Under arbeid','Til oppfølging'])}${area('Beskrivelse','description','Hva ble meldt eller observert?')}${area('Utførte tiltak','measures','Hva ble gjort, og hva var resultatet?')}${area('Videre oppfølging','followup','Hva gjenstår? Hvem følger opp?')}</div></article>`}
+function incidentHTML(x,i){const field=(t,k,type='text')=>`<label class="field">${t}<input type="${type}" data-index="${i}" data-ikey="${k}" value="${esc(x[k]??'')}"></label>`;const select=(t,k,opts)=>`<label class="field">${t}<select data-index="${i}" data-ikey="${k}">${opts.map(v=>`<option ${x[k]===v?'selected':''}>${v}</option>`).join('')}</select></label>`;const area=(t,k,p)=>`<label class="field full">${t}<textarea data-index="${i}" data-ikey="${k}" placeholder="${p}">${esc(x[k])}</textarea></label>`;return `<article class="incident"><div class="incidenthead"><h3>Hendelse ${i+1}</h3><button class="btn danger small" type="button" data-remove="${i}">Fjern</button></div><div class="fields">${field('Dato','date','date')}${field('Sted / adresse / anlegg','place')}<div class="field full"><div class="incident-tools"><button class="btn light small" type="button" id="incident-gps">📍 Bruk min posisjon</button><button class="btn light small" type="button" id="incident-map">Åpne i kart</button></div><small class="muted" id="geo-status">GPS er valgfritt. Adresse kan også brukes i kartet.</small></div>${field('Hvem var på stedet? (valgfritt)','attendees')}${field('Telefonnummer for spørsmål (valgfritt)','phone','tel')}${field('Mottatt kl.','time','time')}${field('Avsluttet kl.','endtime','time')}${select('Fagområde','area',['Vann','Avløp','Overvann','Annet'])}${select('Hendelsestype','type',['Annet','Vannlekkasje','Lavt vanntrykk / vannstans','Tett avløp','Pumpestasjon / alarm','Oversvømmelse','Driftskontroll'])}${select('Prioritet','priority',['Normal','Høy','Akutt'])}${select('Status','status',['Avsluttet','Under arbeid','Til oppfølging'])}${area('Beskrivelse','description','Hva ble meldt eller observert?')}${area('Utførte tiltak','measures','Hva ble gjort, og hva var resultatet?')}${area('Videre oppfølging','followup','Hva gjenstår? Hvem følger opp?')}<div class="field full incident-photo-upload"><strong>Bilder fra hendelsen (maks 3)</strong><div class="incident-tools"><label class="btn light small">📷 Ta bilde<input class="hidden" type="file" accept="image/*" capture="environment" data-photo-input="camera"></label><label class="btn light small">＋ Velg bilde<input class="hidden" type="file" accept="image/*" data-photo-input="gallery"></label></div><div id="incident-photo-list" class="incident-photo-list" aria-live="polite"></div></div></div></article>`}
 function validate(){let msg='';if(!current.name.trim())msg='Fyll inn navn på vaktansvarlig.';else if(!current.from||!current.to||!current.start||!current.end)msg='Fyll inn dato og klokkeslett for vaktperioden.';else if(new Date(current.to+'T'+current.end)<=new Date(current.from+'T'+current.start))msg='Vakten må slutte etter at den starter. Juster sluttdato ved vakt over midnatt.';else if(extraError(current))msg=extraError(current);else if(current.incidents.some(x=>!x.place.trim()||!x.description.trim()))msg='Fyll inn sted og beskrivelse for hver hendelse før ferdigstilling.';$('#formerror').textContent=msg;return !msg}
 function storeCurrent(manual){if(!current)return true;current.updated=now();const i=reports.findIndex(x=>x.id===current.id);if(i<0)reports.unshift(structuredClone(current));else reports[i]=structuredClone(current);const ok=persist();if($('#savedtime'))$('#savedtime').textContent=ok?'Lagret på denne enheten kl. '+new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'}):'Lagring blokkert! Bruk «Lagre rapportfil (JSON)» for å beholde rapporten.';return ok}
 function uniqueFilePart(){const d=new Date();return today()+'-'+d.toTimeString().slice(0,8).replace(/:/g,'-')+'-'+uid().slice(0,8)}
@@ -96,7 +238,7 @@ function saveReportToPhone(r){if(!r)return;storeCurrent(false);const snapshot=st
 function download(data,name,type){const a=document.createElement('a'),url=URL.createObjectURL(new Blob(['\ufeff',data],{type}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}
 function medvaktNames(r){return ['colleague','colleague2','colleague3','colleague4','colleague5'].map(k=>r[k]||'').filter(n=>n.trim()).join(', ')}
 function exportCSV(){const rows=[['Vaktansvarlig','Medvakt','Ekstravakt','Ekstravakt fra dato','Ekstravakt til dato','Fra','Start','Til','Slutt','Vakttype','Rapportstatus','Oppsummering','Overlevering','Hendelsesdato','Mottatt','Avsluttet','Sted','Hvem var på stedet','Telefonnummer','Fagområde','Hendelsestype','Prioritet','Hendelsesstatus','Beskrivelse','Tiltak','Oppfølging']];reports.forEach(r=>(r.incidents.length?r.incidents:[{}]).forEach(x=>rows.push([r.name,medvaktNames(r),extraShifts(r).map(x=>x.name).join(' | '),extraShifts(r).map(x=>x.from).join(' | '),extraShifts(r).map(x=>x.to).join(' | '),r.from,r.start,r.to,r.end,r.shift,r.status==='done'?'Ferdigstilt':'Utkast',r.summary,r.handover,x.date,x.time,x.endtime,x.place,x.attendees||'',x.phone||'',x.area,x.type,x.priority,x.status,x.description,x.measures,x.followup])));download(rows.map(row=>row.map(v=>'"'+String(v??'').replace(/^[=+@\-]/,"'"+'$&').replace(/"/g,'""')+'"').join(';')).join('\r\n'),'vaktrapporter-'+today()+'.csv','text/csv;charset=utf-8')}
-function validReport(r){return r&&typeof r==='object'&&typeof r.id==='string'&&['name','colleague','from','to','start','end','shift','summary','handover','updated'].every(k=>typeof r[k]==='string')&&['colleague2','colleague3','colleague4','colleague5','extravakt','extraFrom','extraTo'].every(k=>r[k]===undefined||typeof r[k]==='string')&&(r.extraShifts===undefined||(Array.isArray(r.extraShifts)&&r.extraShifts.every(x=>x&&['name','from','to'].every(k=>typeof x[k]==='string'))))&&['draft','done'].includes(r.status)&&Array.isArray(r.checks)&&r.checks.length===4&&r.checks.every(v=>typeof v==='boolean')&&Array.isArray(r.incidents)&&r.incidents.every(x=>x&&['date','time','endtime','place','area','type','priority','status','description','measures','followup'].every(k=>typeof x[k]==='string')&&(x.phone===undefined||typeof x.phone==='string')&&(x.attendees===undefined||typeof x.attendees==='string'))}
+function validReport(r){return r&&typeof r==='object'&&typeof r.id==='string'&&['name','colleague','from','to','start','end','shift','summary','handover','updated'].every(k=>typeof r[k]==='string')&&['colleague2','colleague3','colleague4','colleague5','extravakt','extraFrom','extraTo'].every(k=>r[k]===undefined||typeof r[k]==='string')&&(r.extraShifts===undefined||(Array.isArray(r.extraShifts)&&r.extraShifts.every(x=>x&&['name','from','to'].every(k=>typeof x[k]==='string'))))&&['draft','done'].includes(r.status)&&Array.isArray(r.checks)&&r.checks.length===4&&r.checks.every(v=>typeof v==='boolean')&&Array.isArray(r.incidents)&&r.incidents.every(x=>x&&['date','time','endtime','place','area','type','priority','status','description','measures','followup'].every(k=>typeof x[k]==='string')&&(x.phone===undefined||typeof x.phone==='string')&&(x.attendees===undefined||typeof x.attendees==='string')&&(x.lat===undefined||typeof x.lat==='string')&&(x.lng===undefined||typeof x.lng==='string'))}
 async function importReports(e){const f=e.target.files?.[0];if(e.target)e.target.value='';if(!f)return;try{
  if(f.size>5e6)throw Error('Filen er for stor');
  const data=JSON.parse((await f.text()).replace(/^\uFEFF/,''));
